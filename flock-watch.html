@@ -1,0 +1,691 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Flock Watch — Community Camera Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Courier+Prime:ital,wght@0,400;0,700;1,400&family=Lora:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+  :root{
+    --jacket: #C6B384;
+    --paper: #F1E8CE;
+    --paper-shadow: #E4D8B4;
+    --ink: #2A2118;
+    --ink-soft: #6E6047;
+    --stamp-red: #8F2F20;
+    --stamp-blue: #2C4456;
+    --rule: #B7A26F;
+    --rule-soft: #D3C49A;
+    --font-type: 'Courier Prime', monospace;
+    --font-read: 'Lora', serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background:var(--jacket);
+    background-image:
+      repeating-linear-gradient(0deg, rgba(0,0,0,0.025) 0px, rgba(0,0,0,0.025) 1px, transparent 1px, transparent 3px);
+    color:var(--ink);
+    font-family:var(--font-read);
+    line-height:1.55;
+  }
+  .wrap{
+    max-width:800px;
+    margin:0 auto;
+    padding:56px 20px 90px;
+  }
+
+  /* ---- Folder tab + sheet ---- */
+  .tab{
+    display:inline-block;
+    font-family:var(--font-type);
+    font-size:0.78rem;
+    letter-spacing:0.02em;
+    background:var(--paper);
+    color:var(--ink-soft);
+    padding:7px 18px 9px;
+    border:1px solid var(--rule);
+    border-bottom:none;
+    transform:rotate(-1deg);
+    position:relative;
+    top:1px;
+    margin-left:22px;
+  }
+  .sheet{
+    background:var(--paper);
+    border:1px solid var(--rule);
+    box-shadow:0 10px 0 -6px var(--paper-shadow), 0 18px 0 -12px var(--paper-shadow);
+    padding:34px 34px 10px;
+  }
+
+  /* ---- Masthead ---- */
+  header.masthead{
+    border-bottom:2px solid var(--ink);
+    padding-bottom:16px;
+    margin-bottom:24px;
+  }
+  .masthead-top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    gap:16px;
+    flex-wrap:wrap;
+  }
+  h1{
+    font-family:var(--font-type);
+    font-weight:700;
+    font-size:1.9rem;
+    letter-spacing:0.01em;
+    margin:0;
+    color:var(--ink);
+  }
+  .tagline{
+    font-family:var(--font-read);
+    font-style:italic;
+    font-size:0.98rem;
+    color:var(--ink-soft);
+    margin-top:8px;
+    max-width:42ch;
+  }
+  .count-badge{
+    font-family:var(--font-type);
+    font-size:0.75rem;
+    color:var(--ink-soft);
+    text-align:right;
+    white-space:nowrap;
+    border:1px solid var(--rule);
+    padding:6px 12px;
+    transform:rotate(1deg);
+  }
+  .count-badge strong{
+    display:block;
+    font-size:1.5rem;
+    color:var(--ink);
+    line-height:1.1;
+  }
+  .notice{
+    margin-top:16px;
+    font-size:0.86rem;
+    color:var(--ink-soft);
+    padding:10px 14px;
+    background:var(--paper-shadow);
+  }
+
+  /* ---- Controls ---- */
+  .controls{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    align-items:center;
+    margin-bottom:24px;
+  }
+  input[type="text"], select, textarea, input[type="date"]{
+    font-family:var(--font-read);
+    font-size:0.94rem;
+    background:var(--paper);
+    border:1px solid var(--rule);
+    color:var(--ink);
+    padding:9px 11px;
+    border-radius:0;
+  }
+  input[type="text"]:focus, select:focus, textarea:focus, input[type="date"]:focus{
+    outline:2px solid var(--stamp-blue);
+    outline-offset:1px;
+  }
+  #searchInput{flex:1 1 220px;}
+  #statusFilter{flex:0 0 auto;}
+  .btn{
+    font-family:var(--font-type);
+    font-weight:700;
+    font-size:0.85rem;
+    border:1px solid var(--ink);
+    background:var(--ink);
+    color:var(--paper);
+    padding:10px 16px;
+    border-radius:0;
+    cursor:pointer;
+    transition:transform 0.08s ease, background 0.15s ease;
+  }
+  .btn:hover{background:var(--stamp-blue);}
+  .btn:active{transform:scale(0.98);}
+  .btn.secondary{
+    background:transparent;
+    color:var(--ink);
+  }
+  .btn.secondary:hover{background:var(--paper-shadow);}
+
+  /* ---- Form panel ---- */
+  .form-panel{
+    background:var(--paper-shadow);
+    border:1px dashed var(--rule);
+    padding:20px;
+    margin-bottom:26px;
+    display:none;
+  }
+  .form-panel.open{display:block;}
+  .form-panel h2{
+    font-family:var(--font-type);
+    font-size:1.05rem;
+    margin:0 0 14px;
+    font-weight:700;
+  }
+  .field-row{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-bottom:14px;
+  }
+  .field{display:flex;flex-direction:column;gap:5px;}
+  .field label{
+    font-family:var(--font-read);
+    font-style:italic;
+    font-size:0.82rem;
+    color:var(--ink-soft);
+  }
+  .field textarea{resize:vertical;min-height:60px;}
+  .form-actions{display:flex;gap:10px;margin-top:6px;}
+
+  /* ---- List ---- */
+  .entry-list{display:flex;flex-direction:column;gap:0;}
+  .entry{
+    border-bottom:1px solid var(--rule-soft);
+    padding:20px 0;
+    display:grid;
+    grid-template-columns:1fr auto;
+    gap:16px;
+    align-items:start;
+  }
+  .entry:first-child{border-top:1px solid var(--rule-soft);}
+  .entry-case{
+    font-family:var(--font-type);
+    font-size:0.72rem;
+    color:var(--ink-soft);
+    display:block;
+    margin-bottom:3px;
+  }
+  .entry-body h3{
+    font-family:var(--font-read);
+    font-size:1.2rem;
+    font-weight:600;
+    margin:0 0 4px;
+  }
+  .entry-date{
+    font-family:var(--font-type);
+    font-size:0.76rem;
+    color:var(--ink-soft);
+  }
+  .entry-photo{
+    font-size:0.88rem;
+    font-style:italic;
+    color:var(--ink-soft);
+    margin:6px 0 0;
+  }
+  .entry-notes{
+    font-size:0.94rem;
+    color:var(--ink);
+    margin:8px 0 0;
+    white-space:pre-wrap;
+  }
+  .entry-reporter{
+    font-family:var(--font-type);
+    font-size:0.72rem;
+    color:var(--ink-soft);
+    margin-top:8px;
+  }
+  .stamp{
+    display:inline-block;
+    font-family:var(--font-type);
+    font-weight:700;
+    font-size:0.75rem;
+    letter-spacing:0.04em;
+    padding:4px 10px;
+    border:2px solid;
+    transform:rotate(-3deg);
+    white-space:nowrap;
+  }
+  .stamp.active{color:var(--stamp-red);border-color:var(--stamp-red);}
+  .stamp.removed{color:var(--stamp-blue);border-color:var(--stamp-blue);transform:rotate(2deg);}
+  @keyframes stampdown{
+    0%{transform:scale(1.8) rotate(-8deg);opacity:0;}
+    60%{transform:scale(0.95) rotate(-3deg);opacity:1;}
+    100%{transform:scale(1) rotate(-3deg);opacity:1;}
+  }
+  .stamp.just-set{animation:stampdown 0.28s ease-out;}
+  .entry-actions{
+    display:flex;
+    flex-direction:column;
+    gap:7px;
+    align-items:flex-end;
+  }
+  .link-btn{
+    background:none;
+    border:none;
+    font-family:var(--font-read);
+    font-style:italic;
+    font-size:0.82rem;
+    color:var(--ink-soft);
+    cursor:pointer;
+    padding:2px 0;
+    text-decoration:underline;
+    text-underline-offset:2px;
+  }
+  .link-btn:hover{color:var(--ink);}
+  .link-btn.danger:hover{color:var(--stamp-red);}
+
+  /* ---- Empty / loading states ---- */
+  .empty-state{
+    padding:50px 10px;
+    text-align:center;
+    color:var(--ink-soft);
+  }
+  .empty-state p{margin:6px 0;}
+  .empty-state .big{
+    font-family:var(--font-type);
+    font-size:1.1rem;
+    color:var(--ink);
+  }
+
+  @media (max-width:640px){
+    .wrap{padding:36px 12px 70px;}
+    .sheet{padding:24px 18px 10px;}
+    h1{font-size:1.5rem;}
+    .field-row{grid-template-columns:1fr;}
+    .entry{grid-template-columns:1fr;}
+    .entry-actions{flex-direction:row;flex-wrap:wrap;}
+    .masthead-top{flex-direction:column;}
+    .count-badge{text-align:left;transform:none;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="tab">case file — camera watch</div>
+  <div class="sheet">
+
+  <header class="masthead">
+    <div class="masthead-top">
+      <div>
+        <h1>FLOCK WATCH</h1>
+        <div class="tagline">Where the license-plate cameras are, who's seen them, and whether they're still standing.</div>
+      </div>
+      <div class="count-badge" id="countBadge"><strong>0</strong>on file</div>
+    </div>
+    <div class="notice">Shared record — anyone with this page can read and add entries. Leave out anything you wouldn't want public.</div>
+  </header>
+
+  <div class="controls">
+    <input type="text" id="searchInput" placeholder="Search by location or notes…">
+    <select id="statusFilter">
+      <option value="all">All statuses</option>
+      <option value="active">Active only</option>
+      <option value="removed">Removed only</option>
+    </select>
+    <button class="btn" id="toggleFormBtn">+ File a sighting</button>
+  </div>
+
+  <div class="form-panel" id="formPanel">
+    <h2>new entry</h2>
+    <div class="field-row">
+      <div class="field">
+        <label for="fLocation">Location</label>
+        <input type="text" id="fLocation" placeholder="Cross street, address, or landmark">
+      </div>
+      <div class="field">
+        <label for="fDate">Date spotted</label>
+        <input type="date" id="fDate">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fStatus">Status</label>
+        <select id="fStatus">
+          <option value="active">Active</option>
+          <option value="removed">Removed</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fReporter">Reported by (optional)</label>
+        <input type="text" id="fReporter" placeholder="Name or initials">
+      </div>
+    </div>
+    <div class="field-row" style="grid-template-columns:1fr;">
+      <div class="field">
+        <label for="fPhoto">Photo description</label>
+        <input type="text" id="fPhoto" placeholder="e.g. mounted on stop sign pole, facing north">
+      </div>
+    </div>
+    <div class="field-row" style="grid-template-columns:1fr;">
+      <div class="field">
+        <label for="fNotes">Notes</label>
+        <textarea id="fNotes" placeholder="Anything else worth recording"></textarea>
+      </div>
+    </div>
+    <div class="form-actions">
+      <button class="btn" id="saveEntryBtn">Save entry</button>
+      <button class="btn secondary" id="cancelFormBtn">Cancel</button>
+    </div>
+  </div>
+
+  <div id="listContainer">
+    <div class="empty-state"><p class="big">Loading the file…</p></div>
+  </div>
+
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = 'https://qgymszrpaicqgiwcyxpd.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_VL8Zf1BFi9eFbtLNFSBMOg_3fcXxfpw';
+const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const TABLE = 'camera_entries';
+let entries = [];
+let editingId = null;
+
+const listContainer = document.getElementById('listContainer');
+const countBadge = document.getElementById('countBadge');
+const formPanel = document.getElementById('formPanel');
+const toggleFormBtn = document.getElementById('toggleFormBtn');
+const cancelFormBtn = document.getElementById('cancelFormBtn');
+const saveEntryBtn = document.getElementById('saveEntryBtn');
+const searchInput = document.getElementById('searchInput');
+const statusFilter = document.getElementById('statusFilter');
+
+function fmtDate(iso){
+  if(!iso) return '—';
+  const d = new Date(iso + 'T00:00:00');
+  if(isNaN(d)) return iso;
+  return d.toLocaleDateString(undefined, {year:'numeric', month:'short', day:'numeric'});
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str || '';
+  return div.innerHTML;
+}
+
+const SEED_ENTRIES = [
+  {
+    id: 'seed-zaferia',
+    location: 'Shopping center near Anaheim St & Redondo Ave, Zaferia — Food 4 Less / Harbor Freight lot, Long Beach, CA',
+    date: '2026-08-17',
+    status: 'active',
+    reporter: 'Long Beach Classic (news report)',
+    photo: 'Camera visible near property entrances',
+    notes: "Source: Long Beach Classic, \u201cFlock Cameras Are All Over Long Beach\u201d, Aug 17, 2026. Operated by Long Beach Police Department.",
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-1', location: 'Long Beach, CA \u2014 33.8470, -118.1252', date: '2026-08-05', status: 'active',
+    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    notes: 'Operator: Flock Safety. Community-verified ALPR location, not an official department list. Source: DeFlock/OpenStreetMap data via mytownview.com. Map: https://www.google.com/maps/search/?api=1&query=33.8469852,-118.1251779',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-2', location: 'Long Beach, CA \u2014 33.7755, -118.1116', date: '2026-08-05', status: 'active',
+    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    notes: 'Operator: Flock Safety, facing ~174\u00b0. Source: DeFlock/OpenStreetMap data via mytownview.com. Map: https://www.google.com/maps/search/?api=1&query=33.7754763,-118.1116205',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-3', location: 'Long Beach, CA \u2014 33.7885, -118.1163', date: '2026-08-05', status: 'active',
+    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    notes: 'Operator: Flock Safety, facing ~165\u00b0. Source: DeFlock/OpenStreetMap data via mytownview.com. Map: https://www.google.com/maps/search/?api=1&query=33.7884756,-118.1163477',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-4', location: 'Long Beach, CA \u2014 33.7821, -118.1215', date: '2026-08-05', status: 'active',
+    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    notes: 'Operator: Flock Safety, facing ~260\u00b0. Source: DeFlock/OpenStreetMap data via mytownview.com. Map: https://www.google.com/maps/search/?api=1&query=33.7821466,-118.1214965',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-5', location: 'Long Beach, CA \u2014 33.7822, -118.1220', date: '2026-08-05', status: 'active',
+    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    notes: 'Operator: Axon Enterprise, facing ~252\u00b0. Source: DeFlock/OpenStreetMap data via mytownview.com. Map: https://www.google.com/maps/search/?api=1&query=33.7821895,-118.1220233',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-6', location: 'Long Beach, CA \u2014 33.7825, -118.1537', date: '2026-08-05', status: 'active',
+    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    notes: 'Operator: Flock Safety, facing ~145\u00b0. Source: DeFlock/OpenStreetMap data via mytownview.com. Map: https://www.google.com/maps/search/?api=1&query=33.7824727,-118.1536578',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-7', location: 'Long Beach, CA \u2014 33.8077, -118.1248', date: '2026-08-05', status: 'active',
+    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    notes: 'Operator: Flock Safety, facing ~107\u00b0. Source: DeFlock/OpenStreetMap data via mytownview.com. Map: https://www.google.com/maps/search/?api=1&query=33.8077166,-118.1248338',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-8', location: 'Long Beach, CA \u2014 33.7894, -118.1763', date: '2026-08-05', status: 'active',
+    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    notes: 'Operator: Flock Safety, facing ~108\u00b0. Source: DeFlock/OpenStreetMap data via mytownview.com. Map: https://www.google.com/maps/search/?api=1&query=33.7894104,-118.17627',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-9', location: 'Long Beach, CA \u2014 33.8071, -118.1248', date: '2026-08-05', status: 'active',
+    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    notes: 'Operator: Flock Safety, facing ~57\u00b0. Source: DeFlock/OpenStreetMap data via mytownview.com. Map: https://www.google.com/maps/search/?api=1&query=33.8070842,-118.1248177',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-10', location: 'Long Beach, CA \u2014 33.7896, -118.1745', date: '2026-08-05', status: 'active',
+    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    notes: 'Operator: Flock Safety, facing ~24\u00b0. Source: DeFlock/OpenStreetMap data via mytownview.com. Map: https://www.google.com/maps/search/?api=1&query=33.789582,-118.1745153',
+    updatedAt: new Date().toISOString()
+  }
+];
+
+function rowToEntry(row){
+  return {
+    id: row.id,
+    location: row.location,
+    date: row.date,
+    status: row.status,
+    reporter: row.reporter,
+    photo: row.photo,
+    notes: row.notes,
+    updatedAt: row.updated_at
+  };
+}
+
+function entryToRow(entry){
+  return {
+    id: entry.id,
+    location: entry.location,
+    date: entry.date,
+    status: entry.status,
+    reporter: entry.reporter,
+    photo: entry.photo,
+    notes: entry.notes,
+    updated_at: entry.updatedAt
+  };
+}
+
+async function loadEntries(){
+  const { data, error } = await db.from(TABLE).select('*');
+  if(error){
+    listContainer.innerHTML = `<div class="empty-state"><p class="big">Couldn't load the log</p><p>${escapeHtml(error.message)}</p></div>`;
+    return;
+  }
+  entries = (data || []).map(rowToEntry);
+  if(entries.length === 0){
+    const { error: seedError } = await db.from(TABLE).insert(SEED_ENTRIES.map(entryToRow));
+    if(!seedError){
+      entries = SEED_ENTRIES.slice();
+    }
+  }
+  render();
+}
+
+async function insertEntry(entry){
+  const { error } = await db.from(TABLE).insert([entryToRow(entry)]);
+  if(error) alert('Could not save — ' + error.message);
+}
+
+async function updateEntryRow(entry){
+  const { error } = await db.from(TABLE).update(entryToRow(entry)).eq('id', entry.id);
+  if(error) alert('Could not save — ' + error.message);
+}
+
+async function deleteEntryRow(id){
+  const { error } = await db.from(TABLE).delete().eq('id', id);
+  if(error) alert('Could not delete — ' + error.message);
+}
+
+function openForm(entry){
+  editingId = entry ? entry.id : null;
+  document.getElementById('fLocation').value = entry ? entry.location : '';
+  document.getElementById('fDate').value = entry ? entry.date : new Date().toISOString().slice(0,10);
+  document.getElementById('fStatus').value = entry ? entry.status : 'active';
+  document.getElementById('fReporter').value = entry ? entry.reporter : '';
+  document.getElementById('fPhoto').value = entry ? entry.photo : '';
+  document.getElementById('fNotes').value = entry ? entry.notes : '';
+  document.querySelector('#formPanel h2').textContent = entry ? 'Edit sighting' : 'New sighting';
+  formPanel.classList.add('open');
+  toggleFormBtn.textContent = 'Close form';
+  document.getElementById('fLocation').focus();
+}
+
+function closeForm(){
+  editingId = null;
+  formPanel.classList.remove('open');
+  toggleFormBtn.textContent = '+ Log a camera';
+}
+
+toggleFormBtn.addEventListener('click', () => {
+  if(formPanel.classList.contains('open')){
+    closeForm();
+  }else{
+    openForm(null);
+  }
+});
+cancelFormBtn.addEventListener('click', closeForm);
+
+saveEntryBtn.addEventListener('click', async () => {
+  const location = document.getElementById('fLocation').value.trim();
+  if(!location){
+    document.getElementById('fLocation').focus();
+    return;
+  }
+  const entryData = {
+    id: editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,7)),
+    location,
+    date: document.getElementById('fDate').value || new Date().toISOString().slice(0,10),
+    status: document.getElementById('fStatus').value,
+    reporter: document.getElementById('fReporter').value.trim(),
+    photo: document.getElementById('fPhoto').value.trim(),
+    notes: document.getElementById('fNotes').value.trim(),
+    updatedAt: new Date().toISOString()
+  };
+
+  const wasEditing = !!editingId;
+  if(wasEditing){
+    const idx = entries.findIndex(e => e.id === editingId);
+    if(idx > -1) entries[idx] = entryData;
+  }else{
+    entries.push(entryData);
+  }
+
+  render();
+  closeForm();
+  saveEntryBtn.disabled = true;
+  if(wasEditing){
+    await updateEntryRow(entryData);
+  }else{
+    await insertEntry(entryData);
+  }
+  saveEntryBtn.disabled = false;
+});
+
+async function toggleStatus(id){
+  const idx = entries.findIndex(e => e.id === id);
+  if(idx === -1) return;
+  entries[idx].status = entries[idx].status === 'active' ? 'removed' : 'active';
+  entries[idx].updatedAt = new Date().toISOString();
+  lastToggledId = id;
+  render();
+  await updateEntryRow(entries[idx]);
+}
+
+async function deleteEntry(id){
+  if(!confirm('Remove this entry from the shared log? This can\'t be undone.')) return;
+  entries = entries.filter(e => e.id !== id);
+  render();
+  await deleteEntryRow(id);
+}
+
+function editEntry(id){
+  const entry = entries.find(e => e.id === id);
+  if(entry) openForm(entry);
+}
+
+function getFiltered(){
+  const q = searchInput.value.trim().toLowerCase();
+  const statusVal = statusFilter.value;
+  return entries
+    .filter(e => statusVal === 'all' || e.status === statusVal)
+    .filter(e => !q || (e.location + ' ' + e.notes).toLowerCase().includes(q))
+    .sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+}
+
+function computeCaseNumbers(){
+  const sorted = [...entries].sort((a,b) => (a.date || '').localeCompare(b.date || '') || a.id.localeCompare(b.id));
+  const map = {};
+  sorted.forEach((e,i) => { map[e.id] = i + 1; });
+  return map;
+}
+
+let lastToggledId = null;
+
+function render(){
+  const filtered = getFiltered();
+  const numberMap = computeCaseNumbers();
+  countBadge.innerHTML = `<strong>${entries.length}</strong>on file`;
+
+  if(entries.length === 0){
+    listContainer.innerHTML = `<div class="empty-state">
+      <p class="big">Nothing on file yet</p>
+      <p>Be the first to file a sighting.</p>
+    </div>`;
+    return;
+  }
+  if(filtered.length === 0){
+    listContainer.innerHTML = `<div class="empty-state">
+      <p class="big">No matches</p>
+      <p>Try a different search term or filter.</p>
+    </div>`;
+    return;
+  }
+
+  listContainer.innerHTML = `<div class="entry-list">
+    ${filtered.map(e => `
+      <div class="entry">
+        <div class="entry-body">
+          <span class="entry-case">No. ${String(numberMap[e.id]).padStart(3,'0')} — <span class="entry-date">${fmtDate(e.date)}</span></span>
+          <h3>${escapeHtml(e.location)}</h3>
+          ${e.photo ? `<div class="entry-photo">${escapeHtml(e.photo)}</div>` : ''}
+          ${e.notes ? `<div class="entry-notes">${escapeHtml(e.notes)}</div>` : ''}
+          ${e.reporter ? `<div class="entry-reporter">Reported by ${escapeHtml(e.reporter)}</div>` : ''}
+        </div>
+        <div class="entry-actions">
+          <span class="stamp ${e.status}${e.id === lastToggledId ? ' just-set' : ''}">${e.status === 'active' ? 'active' : 'filed'}</span>
+          <button class="link-btn" onclick="toggleStatus('${e.id}')">Mark ${e.status === 'active' ? 'filed' : 'active'}</button>
+          <button class="link-btn" onclick="editEntry('${e.id}')">Edit</button>
+          <button class="link-btn danger" onclick="deleteEntry('${e.id}')">Delete</button>
+        </div>
+      </div>
+    `).join('')}
+  </div>`;
+}
+
+searchInput.addEventListener('input', render);
+statusFilter.addEventListener('change', render);
+
+loadEntries();
+</script>
+</body>
+</html>
