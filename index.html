@@ -11,24 +11,24 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root{
-    --jacket: #C6B384;
-    --paper: #F1E8CE;
-    --paper-shadow: #E4D8B4;
-    --ink: #2A2118;
+    --void: #0E0C09;
+    --void-edge: #1A1610;
+    --paper: #EDE1BC;
+    --paper-shadow: #E0D2A5;
+    --ink: #241C12;
     --ink-soft: #6E6047;
-    --stamp-red: #8F2F20;
-    --stamp-blue: #2C4456;
+    --stamp-red: #C1402B;
+    --stamp-blue: #3E7A8F;
     --rule: #B7A26F;
     --rule-soft: #D3C49A;
+    --glow: rgba(224,178,90,0.16);
     --font-type: 'Courier Prime', monospace;
     --font-read: 'Lora', serif;
   }
   *{box-sizing:border-box;}
   body{
     margin:0;
-    background:var(--jacket);
-    background-image:
-      repeating-linear-gradient(0deg, rgba(0,0,0,0.025) 0px, rgba(0,0,0,0.025) 1px, transparent 1px, transparent 3px);
+    background:radial-gradient(ellipse 900px 600px at 50% 20%, var(--void-edge), var(--void) 70%);
     color:var(--ink);
     font-family:var(--font-read);
     line-height:1.55;
@@ -58,7 +58,7 @@
   .sheet{
     background:var(--paper);
     border:1px solid var(--rule);
-    box-shadow:0 10px 0 -6px var(--paper-shadow), 0 18px 0 -12px var(--paper-shadow);
+    box-shadow:0 0 0 1px rgba(0,0,0,0.3), 0 30px 80px 10px var(--glow), 0 0 140px 20px rgba(224,178,90,0.08);
     padding:34px 34px 10px;
   }
 
@@ -78,10 +78,11 @@
   h1{
     font-family:var(--font-type);
     font-weight:700;
-    font-size:1.9rem;
-    letter-spacing:0.01em;
+    font-size:3rem;
+    letter-spacing:-0.01em;
     margin:0;
     color:var(--ink);
+    line-height:0.95;
   }
   .tagline{
     font-family:var(--font-read);
