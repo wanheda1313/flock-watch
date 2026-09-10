@@ -20,6 +20,8 @@
     --accent: #3B82F6;
     --accent-bright: #6FA9FF;
     --accent-soft: rgba(59,130,246,0.16);
+    --accent2: #2DD4BF;
+    --accent2-soft: rgba(45,212,191,0.14);
     --slate: #64748B;
     --slate-soft: rgba(100,116,139,0.18);
     --font-display: 'Sora', sans-serif;
@@ -46,9 +48,9 @@
     display:flex;
     flex-direction:column;
     justify-content:flex-end;
-    padding:60px 24px 32px;
+    padding:60px 32px 32px;
   }
-  .hero-inner{max-width:900px;margin:0 auto;width:100%;}
+  .hero-inner{max-width:1200px;margin:0 auto;width:100%;}
   h1{
     font-family:var(--font-display);
     font-weight:800;
@@ -87,11 +89,15 @@
     background:radial-gradient(circle at 32% 28%, #94A3B8, var(--slate) 55%, #2B3646 100%);
     box-shadow:0 0 0 1px rgba(255,255,255,0.08), 0 0 22px rgba(100,116,139,0.4);
   }
+  .stat-badge.teal{
+    background:radial-gradient(circle at 32% 28%, #6EE7DB, var(--accent2) 55%, #0F4A44 100%);
+    box-shadow:0 0 0 1px rgba(255,255,255,0.08), 0 0 22px rgba(45,212,191,0.4);
+  }
   .stat-badge strong{font-family:var(--font-display);font-size:1.4rem;line-height:1;}
   .stat-badge span{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.05em;opacity:0.85;margin-top:2px;}
 
   /* ---- Content ---- */
-  .content{max-width:900px;margin:0 auto;padding:28px 20px 90px;}
+  .content{max-width:1200px;margin:0 auto;padding:28px 28px 90px;}
   .notice{
     font-size:0.86rem;
     color:var(--text-soft);
@@ -102,11 +108,18 @@
     margin-bottom:24px;
   }
 
+  .section-title{
+    font-family:var(--font-display);
+    font-size:1.05rem;
+    font-weight:700;
+    color:#fff;
+    margin:0 0 14px;
+  }
+
   #mapContainer{
-    height:380px;
+    height:400px;
     border-radius:16px;
     border:1px solid var(--border);
-    margin-bottom:22px;
     overflow:hidden;
   }
   .leaflet-popup-content-wrapper{
@@ -126,6 +139,31 @@
     background:none;border:none;color:var(--accent-bright);cursor:pointer;
     padding:0;
   }
+
+  /* ---- Timeline controls ---- */
+  .timeline-bar{
+    display:flex;
+    align-items:center;
+    gap:14px;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:12px 16px;
+    margin:14px 0 22px;
+    flex-wrap:wrap;
+  }
+  .timeline-bar input[type="range"]{
+    flex:1 1 200px;
+    accent-color:var(--accent2);
+  }
+  .timeline-date{
+    font-family:var(--font-display);
+    font-size:0.82rem;
+    color:var(--accent2);
+    white-space:nowrap;
+    min-width:90px;
+  }
+  .timeline-bar .btn{padding:8px 14px;font-size:0.8rem;}
 
   /* ---- Controls ---- */
   .controls{
@@ -151,7 +189,7 @@
     box-shadow:0 0 0 3px var(--accent-soft);
   }
   #searchInput{flex:1 1 220px;}
-  #statusFilter{flex:0 0 auto;}
+  #statusFilter, #cityFilter{flex:0 0 auto;}
   .btn{
     font-family:var(--font-display);
     font-weight:700;
@@ -208,6 +246,7 @@
   .form-actions{display:flex;gap:10px;margin-top:6px;}
 
   /* ---- List ---- */
+  .list-grid{display:grid;grid-template-columns:1fr 320px;gap:24px;align-items:start;}
   .entry-list{display:flex;flex-direction:column;gap:14px;}
   .entry{
     background:var(--card);
@@ -245,11 +284,16 @@
     margin:8px 0 0;
     white-space:pre-wrap;
   }
-  .entry-reporter{
-    font-size:0.78rem;
+  .entry-meta-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+  .entry-tag{
+    font-size:0.72rem;
     color:var(--text-soft);
-    margin-top:10px;
+    background:rgba(255,255,255,0.04);
+    border:1px solid var(--border);
+    border-radius:999px;
+    padding:3px 10px;
   }
+  .entry-tag.agency{color:var(--accent2);border-color:rgba(45,212,191,0.3);}
   .status-pill{
     display:inline-block;
     font-family:var(--font-display);
@@ -280,6 +324,33 @@
   .link-btn:hover{color:var(--accent-bright);}
   .link-btn.danger:hover{color:#F87171;}
 
+  /* ---- Agencies sidebar ---- */
+  .agency-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:18px;
+  }
+  .agency-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding:9px 0;
+    border-bottom:1px solid var(--border);
+    font-size:0.88rem;
+  }
+  .agency-row:last-child{border-bottom:none;}
+  .agency-name{color:var(--text);}
+  .agency-count{
+    font-family:var(--font-display);
+    color:var(--accent2);
+    background:var(--accent2-soft);
+    border-radius:999px;
+    padding:2px 10px;
+    font-size:0.78rem;
+  }
+  .agency-empty{color:var(--text-soft);font-size:0.86rem;}
+
   /* ---- Empty / loading states ---- */
   .empty-state{
     padding:50px 10px;
@@ -293,9 +364,13 @@
     color:#fff;
   }
 
+  @media (max-width:900px){
+    .list-grid{grid-template-columns:1fr;}
+  }
   @media (max-width:640px){
     .hero{min-height:280px;padding:40px 16px 24px;}
     h1{font-size:2.1rem;}
+    .content{padding:24px 16px 70px;}
     #mapContainer{height:280px;}
     .field-row{grid-template-columns:1fr;}
     .entry{grid-template-columns:1fr;}
@@ -313,18 +388,28 @@
       <div class="stat-badge"><strong id="statTotal">0</strong><span>on file</span></div>
       <div class="stat-badge"><strong id="statActive">0</strong><span>active</span></div>
       <div class="stat-badge slate"><strong id="statFiled">0</strong><span>filed</span></div>
+      <div class="stat-badge teal"><strong id="statCities">0</strong><span>cities</span></div>
     </div>
   </div>
 </div>
 
 <div class="content">
 
-  <div class="notice">Shared record — anyone with this page can read and add entries. Leave out anything you wouldn't want public.</div>
+  <div class="notice">Shared record — anyone with this page can read and add entries. Leave out anything you wouldn't want public. Cross-street precision depends on whoever files the entry — coordinate-only entries link straight to Google Maps for the exact spot instead.</div>
 
   <div id="mapContainer"></div>
 
+  <div class="timeline-bar">
+    <button class="btn secondary" id="playBtn">▶ Play growth</button>
+    <input type="range" id="timelineSlider" min="0" max="100" value="100">
+    <span class="timeline-date" id="timelineDate">All time</span>
+  </div>
+
   <div class="controls">
     <input type="text" id="searchInput" placeholder="Search by location or notes…">
+    <select id="cityFilter">
+      <option value="all">All cities</option>
+    </select>
     <select id="statusFilter">
       <option value="all">All statuses</option>
       <option value="active">Active only</option>
@@ -337,21 +422,31 @@
     <h2>New entry</h2>
     <div class="field-row">
       <div class="field">
-        <label for="fLocation">Location</label>
-        <input type="text" id="fLocation" placeholder="Cross street, address, or landmark">
+        <label for="fLocation">Location (cross streets, if you know them)</label>
+        <input type="text" id="fLocation" placeholder="e.g. Anaheim St & Redondo Ave">
       </div>
+      <div class="field">
+        <label for="fCity">City</label>
+        <input type="text" id="fCity" placeholder="e.g. Long Beach">
+      </div>
+    </div>
+    <div class="field-row">
       <div class="field">
         <label for="fDate">Date spotted</label>
         <input type="date" id="fDate">
       </div>
-    </div>
-    <div class="field-row">
       <div class="field">
         <label for="fStatus">Status</label>
         <select id="fStatus">
           <option value="active">Active</option>
           <option value="removed">Removed</option>
         </select>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label for="fAgency">Operating agency (optional)</label>
+        <input type="text" id="fAgency" placeholder="e.g. Long Beach Police Department">
       </div>
       <div class="field">
         <label for="fReporter">Reported by (optional)</label>
@@ -386,8 +481,14 @@
     </div>
   </div>
 
-  <div id="listContainer">
-    <div class="empty-state"><p class="big">Loading…</p></div>
+  <div class="list-grid">
+    <div id="listContainer">
+      <div class="empty-state"><p class="big">Loading…</p></div>
+    </div>
+    <div>
+      <div class="section-title">Known operating agencies</div>
+      <div class="agency-card" id="agencyContainer"><p class="agency-empty">Loading…</p></div>
+    </div>
   </div>
 
 </div>
@@ -401,15 +502,21 @@ let entries = [];
 let editingId = null;
 
 const listContainer = document.getElementById('listContainer');
+const agencyContainer = document.getElementById('agencyContainer');
 const statTotal = document.getElementById('statTotal');
 const statActive = document.getElementById('statActive');
 const statFiled = document.getElementById('statFiled');
+const statCities = document.getElementById('statCities');
 const formPanel = document.getElementById('formPanel');
 const toggleFormBtn = document.getElementById('toggleFormBtn');
 const cancelFormBtn = document.getElementById('cancelFormBtn');
 const saveEntryBtn = document.getElementById('saveEntryBtn');
 const searchInput = document.getElementById('searchInput');
 const statusFilter = document.getElementById('statusFilter');
+const cityFilter = document.getElementById('cityFilter');
+const timelineSlider = document.getElementById('timelineSlider');
+const timelineDate = document.getElementById('timelineDate');
+const playBtn = document.getElementById('playBtn');
 
 function fmtDate(iso){
   if(!iso) return '—';
@@ -427,72 +534,80 @@ function escapeHtml(str){
 const SEED_ENTRIES = [
   {
     id: 'seed-zaferia',
-    location: 'Shopping center near Anaheim St & Redondo Ave, Zaferia — Food 4 Less / Harbor Freight lot, Long Beach, CA',
+    location: 'Anaheim St & Redondo Ave, Zaferia — Food 4 Less / Harbor Freight lot',
+    city: 'Long Beach',
     date: '2026-08-17',
     status: 'active',
+    agency: 'Long Beach Police Department',
     reporter: 'Long Beach Classic (news report)',
     photo: 'Camera visible near property entrances',
-    notes: "Source: Long Beach Classic, \u201cFlock Cameras Are All Over Long Beach\u201d, Aug 17, 2026. Operated by Long Beach Police Department.",
+    notes: "Source: Long Beach Classic, \u201cFlock Cameras Are All Over Long Beach\u201d, Aug 17, 2026.",
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'seed-1', location: 'Long Beach, CA \u2014 33.8470, -118.1252', date: '2026-08-05', status: 'active',
-    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    id: 'seed-1', location: 'Long Beach, CA \u2014 33.8470, -118.1252', city: 'Long Beach', date: '2026-08-05', status: 'active',
+    agency: '', reporter: 'DeFlock / OpenStreetMap community', photo: '',
     notes: 'Operator: Flock Safety. Community-verified via DeFlock/OpenStreetMap, not an official department list.',
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'seed-2', location: 'Long Beach, CA \u2014 33.7755, -118.1116', date: '2026-08-05', status: 'active',
-    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    id: 'seed-2', location: 'Long Beach, CA \u2014 33.7755, -118.1116', city: 'Long Beach', date: '2026-08-05', status: 'active',
+    agency: '', reporter: 'DeFlock / OpenStreetMap community', photo: '',
     notes: 'Operator: Flock Safety, facing ~174\u00b0. Community-verified via DeFlock/OpenStreetMap.',
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'seed-3', location: 'Long Beach, CA \u2014 33.7885, -118.1163', date: '2026-08-05', status: 'active',
-    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    id: 'seed-3', location: 'Long Beach, CA \u2014 33.7885, -118.1163', city: 'Long Beach', date: '2026-08-05', status: 'active',
+    agency: '', reporter: 'DeFlock / OpenStreetMap community', photo: '',
     notes: 'Operator: Flock Safety, facing ~165\u00b0. Community-verified via DeFlock/OpenStreetMap.',
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'seed-4', location: 'Long Beach, CA \u2014 33.7821, -118.1215', date: '2026-08-05', status: 'active',
-    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    id: 'seed-4', location: 'Long Beach, CA \u2014 33.7821, -118.1215', city: 'Long Beach', date: '2026-08-05', status: 'active',
+    agency: '', reporter: 'DeFlock / OpenStreetMap community', photo: '',
     notes: 'Operator: Flock Safety, facing ~260\u00b0. Community-verified via DeFlock/OpenStreetMap.',
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'seed-5', location: 'Long Beach, CA \u2014 33.7822, -118.1220', date: '2026-08-05', status: 'active',
-    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    id: 'seed-5', location: 'Long Beach, CA \u2014 33.7822, -118.1220', city: 'Long Beach', date: '2026-08-05', status: 'active',
+    agency: '', reporter: 'DeFlock / OpenStreetMap community', photo: '',
     notes: 'Operator: Axon Enterprise, facing ~252\u00b0. Community-verified via DeFlock/OpenStreetMap.',
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'seed-6', location: 'Long Beach, CA \u2014 33.7825, -118.1537', date: '2026-08-05', status: 'active',
-    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    id: 'seed-6', location: 'Long Beach, CA \u2014 33.7825, -118.1537', city: 'Long Beach', date: '2026-08-05', status: 'active',
+    agency: '', reporter: 'DeFlock / OpenStreetMap community', photo: '',
     notes: 'Operator: Flock Safety, facing ~145\u00b0. Community-verified via DeFlock/OpenStreetMap.',
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'seed-7', location: 'Long Beach, CA \u2014 33.8077, -118.1248', date: '2026-08-05', status: 'active',
-    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    id: 'seed-7', location: 'Long Beach, CA \u2014 33.8077, -118.1248', city: 'Long Beach', date: '2026-08-05', status: 'active',
+    agency: '', reporter: 'DeFlock / OpenStreetMap community', photo: '',
     notes: 'Operator: Flock Safety, facing ~107\u00b0. Community-verified via DeFlock/OpenStreetMap.',
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'seed-8', location: 'Long Beach, CA \u2014 33.7894, -118.1763', date: '2026-08-05', status: 'active',
-    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    id: 'seed-8', location: 'Long Beach, CA \u2014 33.7894, -118.1763', city: 'Long Beach', date: '2026-08-05', status: 'active',
+    agency: '', reporter: 'DeFlock / OpenStreetMap community', photo: '',
     notes: 'Operator: Flock Safety, facing ~108\u00b0. Community-verified via DeFlock/OpenStreetMap.',
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'seed-9', location: 'Long Beach, CA \u2014 33.8071, -118.1248', date: '2026-08-05', status: 'active',
-    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    id: 'seed-9', location: 'Long Beach, CA \u2014 33.8071, -118.1248', city: 'Long Beach', date: '2026-08-05', status: 'active',
+    agency: '', reporter: 'DeFlock / OpenStreetMap community', photo: '',
     notes: 'Operator: Flock Safety, facing ~57\u00b0. Community-verified via DeFlock/OpenStreetMap.',
     updatedAt: new Date().toISOString()
   },
   {
-    id: 'seed-10', location: 'Long Beach, CA \u2014 33.7896, -118.1745', date: '2026-08-05', status: 'active',
-    reporter: 'DeFlock / OpenStreetMap community', photo: '',
+    id: 'seed-10', location: 'Long Beach, CA \u2014 33.7896, -118.1745', city: 'Long Beach', date: '2026-08-05', status: 'active',
+    agency: '', reporter: 'DeFlock / OpenStreetMap community', photo: '',
     notes: 'Operator: Flock Safety, facing ~24\u00b0. Community-verified via DeFlock/OpenStreetMap.',
+    updatedAt: new Date().toISOString()
+  },
+  {
+    id: 'seed-compton', location: 'Citywide deployment (exact intersections not yet mapped)', city: 'Compton', date: '2026-04-07', status: 'active',
+    agency: 'Compton Police Department / Compton City Council', reporter: 'Compton Chamber of Commerce (news report)', photo: '',
+    notes: '74 ALPR cameras and 37 PTZ cameras approved citywide, unanimous City Council vote April 7, 2026. Individual intersections not yet documented by community mappers — no map pin until specific locations are confirmed.',
     updatedAt: new Date().toISOString()
   }
 ];
@@ -501,8 +616,10 @@ function rowToEntry(row){
   return {
     id: row.id,
     location: row.location,
+    city: row.city,
     date: row.date,
     status: row.status,
+    agency: row.agency,
     reporter: row.reporter,
     photo: row.photo,
     notes: row.notes,
@@ -516,8 +633,10 @@ function entryToRow(entry){
   return {
     id: entry.id,
     location: entry.location,
+    city: entry.city || null,
     date: entry.date,
     status: entry.status,
+    agency: entry.agency || null,
     reporter: entry.reporter,
     photo: entry.photo,
     notes: entry.notes,
@@ -541,7 +660,7 @@ let map = null;
 let markerLayer = null;
 
 function initMap(){
-  map = L.map('mapContainer').setView([33.7838, -118.1500], 12);
+  map = L.map('mapContainer').setView([33.7838, -118.1500], 11);
   L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}', {
     attribution: 'Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
     maxZoom: 16
@@ -549,11 +668,12 @@ function initMap(){
   markerLayer = L.layerGroup().addTo(map);
 }
 
-function renderMap(){
+function renderMap(cutoffDate){
   if(!map) return;
   markerLayer.clearLayers();
   const bounds = [];
   entries.forEach(e => {
+    if(cutoffDate && e.date && e.date > cutoffDate) return;
     const coords = getCoords(e);
     if(!coords) return;
     bounds.push(coords);
@@ -575,10 +695,62 @@ function renderMap(){
       </div>
     `);
   });
-  if(bounds.length > 0){
+  if(!cutoffDate && bounds.length > 0){
     map.fitBounds(bounds, { padding: [30,30], maxZoom: 15 });
   }
 }
+
+/* ---- Timeline (growth-over-time) ---- */
+let timelineDates = [];
+let playTimer = null;
+
+function setupTimeline(){
+  const dated = entries.filter(e => e.date).map(e => e.date).sort();
+  timelineDates = [...new Set(dated)];
+  if(timelineDates.length < 2){
+    document.querySelector('.timeline-bar').style.display = 'none';
+    return;
+  }
+  document.querySelector('.timeline-bar').style.display = 'flex';
+  timelineSlider.max = timelineDates.length - 1;
+  timelineSlider.value = timelineDates.length - 1;
+  timelineDate.textContent = 'All time';
+}
+
+timelineSlider.addEventListener('input', () => {
+  const idx = Number(timelineSlider.value);
+  if(idx >= timelineDates.length - 1){
+    timelineDate.textContent = 'All time';
+    renderMap(null);
+  }else{
+    const cutoff = timelineDates[idx];
+    timelineDate.textContent = fmtDate(cutoff);
+    renderMap(cutoff);
+  }
+});
+
+playBtn.addEventListener('click', () => {
+  if(playTimer){
+    clearInterval(playTimer);
+    playTimer = null;
+    playBtn.textContent = '▶ Play growth';
+    return;
+  }
+  playBtn.textContent = '⏸ Pause';
+  timelineSlider.value = 0;
+  timelineSlider.dispatchEvent(new Event('input'));
+  playTimer = setInterval(() => {
+    let v = Number(timelineSlider.value);
+    if(v >= timelineDates.length - 1){
+      clearInterval(playTimer);
+      playTimer = null;
+      playBtn.textContent = '▶ Play growth';
+      return;
+    }
+    timelineSlider.value = v + 1;
+    timelineSlider.dispatchEvent(new Event('input'));
+  }, 700);
+});
 
 async function loadEntries(){
   const { data, error } = await db.from(TABLE).select('*');
@@ -593,8 +765,10 @@ async function loadEntries(){
       entries = SEED_ENTRIES.slice();
     }
   }
+  populateCityFilter();
   render();
-  renderMap();
+  renderMap(null);
+  setupTimeline();
 }
 
 async function insertEntry(entry){
@@ -612,11 +786,21 @@ async function deleteEntryRow(id){
   if(error) alert('Could not delete — ' + error.message);
 }
 
+function populateCityFilter(){
+  const cities = [...new Set(entries.map(e => e.city).filter(Boolean))].sort();
+  const current = cityFilter.value;
+  cityFilter.innerHTML = '<option value="all">All cities</option>' +
+    cities.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('');
+  if(cities.includes(current)) cityFilter.value = current;
+}
+
 function openForm(entry){
   editingId = entry ? entry.id : null;
   document.getElementById('fLocation').value = entry ? entry.location : '';
+  document.getElementById('fCity').value = entry ? (entry.city || '') : '';
   document.getElementById('fDate').value = entry ? entry.date : new Date().toISOString().slice(0,10);
   document.getElementById('fStatus').value = entry ? entry.status : 'active';
+  document.getElementById('fAgency').value = entry ? (entry.agency || '') : '';
   document.getElementById('fReporter').value = entry ? entry.reporter : '';
   document.getElementById('fPhoto').value = entry ? entry.photo : '';
   document.getElementById('fNotes').value = entry ? entry.notes : '';
@@ -652,8 +836,10 @@ saveEntryBtn.addEventListener('click', async () => {
   const entryData = {
     id: editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,7)),
     location,
+    city: document.getElementById('fCity').value.trim(),
     date: document.getElementById('fDate').value || new Date().toISOString().slice(0,10),
     status: document.getElementById('fStatus').value,
+    agency: document.getElementById('fAgency').value.trim(),
     reporter: document.getElementById('fReporter').value.trim(),
     photo: document.getElementById('fPhoto').value.trim(),
     notes: document.getElementById('fNotes').value.trim(),
@@ -670,8 +856,10 @@ saveEntryBtn.addEventListener('click', async () => {
     entries.push(entryData);
   }
 
+  populateCityFilter();
   render();
-  renderMap();
+  renderMap(null);
+  setupTimeline();
   closeForm();
   saveEntryBtn.disabled = true;
   if(wasEditing){
@@ -688,15 +876,17 @@ async function toggleStatus(id){
   entries[idx].status = entries[idx].status === 'active' ? 'removed' : 'active';
   entries[idx].updatedAt = new Date().toISOString();
   render();
-  renderMap();
+  renderMap(null);
   await updateEntryRow(entries[idx]);
 }
 
 async function deleteEntry(id){
   if(!confirm('Remove this entry from the shared log? This can\'t be undone.')) return;
   entries = entries.filter(e => e.id !== id);
+  populateCityFilter();
   render();
-  renderMap();
+  renderMap(null);
+  setupTimeline();
   await deleteEntryRow(id);
 }
 
@@ -708,18 +898,43 @@ function editEntry(id){
 function getFiltered(){
   const q = searchInput.value.trim().toLowerCase();
   const statusVal = statusFilter.value;
+  const cityVal = cityFilter.value;
   return entries
     .filter(e => statusVal === 'all' || e.status === statusVal)
+    .filter(e => cityVal === 'all' || e.city === cityVal)
     .filter(e => !q || (e.location + ' ' + e.notes).toLowerCase().includes(q))
     .sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+}
+
+function renderAgencies(){
+  const counts = {};
+  entries.forEach(e => {
+    if(e.agency && e.agency.trim()){
+      counts[e.agency] = (counts[e.agency] || 0) + 1;
+    }
+  });
+  const names = Object.keys(counts).sort();
+  if(names.length === 0){
+    agencyContainer.innerHTML = '<p class="agency-empty">No operating agency documented yet for any entry.</p>';
+    return;
+  }
+  agencyContainer.innerHTML = names.map(n => `
+    <div class="agency-row">
+      <span class="agency-name">${escapeHtml(n)}</span>
+      <span class="agency-count">${counts[n]}</span>
+    </div>
+  `).join('');
 }
 
 function render(){
   const filtered = getFiltered();
   const activeCount = entries.filter(e => e.status === 'active').length;
+  const cityCount = new Set(entries.map(e => e.city).filter(Boolean)).size;
   statTotal.textContent = entries.length;
   statActive.textContent = activeCount;
   statFiled.textContent = entries.length - activeCount;
+  statCities.textContent = cityCount;
+  renderAgencies();
 
   if(entries.length === 0){
     listContainer.innerHTML = `<div class="empty-state">
@@ -747,7 +962,11 @@ function render(){
           <h3>${escapeHtml(e.location)}</h3>
           ${e.photo ? `<div class="entry-photo">${escapeHtml(e.photo)}</div>` : ''}
           ${e.notes ? `<div class="entry-notes">${escapeHtml(e.notes)}</div>` : ''}
-          ${e.reporter ? `<div class="entry-reporter">Reported by ${escapeHtml(e.reporter)}</div>` : ''}
+          <div class="entry-meta-row">
+            ${e.city ? `<span class="entry-tag">${escapeHtml(e.city)}</span>` : ''}
+            ${e.agency ? `<span class="entry-tag agency">${escapeHtml(e.agency)}</span>` : ''}
+            ${e.reporter ? `<span class="entry-tag">Reported by ${escapeHtml(e.reporter)}</span>` : ''}
+          </div>
         </div>
         <div class="entry-actions">
           <span class="status-pill ${e.status}">${e.status === 'active' ? 'Active' : 'Filed'}</span>
@@ -763,6 +982,7 @@ function render(){
 
 searchInput.addEventListener('input', render);
 statusFilter.addEventListener('change', render);
+cityFilter.addEventListener('change', render);
 
 initMap();
 loadEntries();
