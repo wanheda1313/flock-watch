@@ -318,6 +318,30 @@
   }
   .route-inputs{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
   .route-inputs input[type="text"]{flex:1 1 220px;}
+  .route-input-wrap{position:relative;flex:1 1 220px;}
+  .route-input-wrap input[type="text"]{width:100%;}
+  .autocomplete-list{
+    position:absolute;
+    top:100%;
+    left:0;
+    right:0;
+    background:var(--card);
+    border:1px solid var(--border);
+    border-top:none;
+    border-radius:0 0 10px 10px;
+    max-height:220px;
+    overflow-y:auto;
+    z-index:1000;
+  }
+  .autocomplete-item{
+    padding:10px 14px;
+    font-size:0.86rem;
+    color:var(--text);
+    cursor:pointer;
+    border-bottom:1px solid var(--border);
+  }
+  .autocomplete-item:last-child{border-bottom:none;}
+  .autocomplete-item:hover{background:var(--card-hover);}
   .route-note{font-size:0.8rem;color:var(--text-soft);margin:8px 0 4px;}
   .route-options{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
   .route-option{
@@ -512,8 +536,14 @@
   <div class="route-card">
     <div class="section-title" style="margin-bottom:10px;">Plan a route</div>
     <div class="route-inputs">
-      <input type="text" id="routeFrom" placeholder="From (address or intersection)">
-      <input type="text" id="routeTo" placeholder="To (address or intersection)">
+      <div class="route-input-wrap">
+        <input type="text" id="routeFrom" placeholder="From (address or intersection)" autocomplete="off">
+        <div class="autocomplete-list" id="routeFromList"></div>
+      </div>
+      <div class="route-input-wrap">
+        <input type="text" id="routeTo" placeholder="To (address or intersection)" autocomplete="off">
+        <div class="autocomplete-list" id="routeToList"></div>
+      </div>
       <button class="btn" id="findRouteBtn">Find routes</button>
     </div>
     <div class="route-note">Shows a few real driving routes and how many documented cameras each one passes near — not a guaranteed camera-free path, since this only knows about cameras logged here.</div>
@@ -1179,6 +1209,50 @@ async function geocode(query){
   return { lat: Number(data[0].lat), lng: Number(data[0].lon) };
 }
 
+function setupAutocomplete(inputId, listId){
+  const input = document.getElementById(inputId);
+  const list = document.getElementById(listId);
+  let debounceTimer = null;
+
+  input.addEventListener('input', () => {
+    clearTimeout(debounceTimer);
+    const q = input.value.trim();
+    if(q.length < 3){
+      list.innerHTML = '';
+      return;
+    }
+    debounceTimer = setTimeout(async () => {
+      try{
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&countrycodes=us&q=${encodeURIComponent(q)}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        list.innerHTML = data.map(d => `<div class="autocomplete-item" data-lat="${d.lat}" data-lng="${d.lon}" data-label="${escapeHtml(d.display_name)}">${escapeHtml(d.display_name)}</div>`).join('');
+      }catch(err){
+        list.innerHTML = '';
+      }
+    }, 350);
+  });
+
+  list.addEventListener('click', (e) => {
+    const item = e.target.closest('.autocomplete-item');
+    if(!item) return;
+    input.value = item.dataset.label;
+    input.dataset.lat = item.dataset.lat;
+    input.dataset.lng = item.dataset.lng;
+    input.dataset.label = item.dataset.label;
+    list.innerHTML = '';
+  });
+
+  document.addEventListener('click', (e) => {
+    if(!input.contains(e.target) && !list.contains(e.target)){
+      list.innerHTML = '';
+    }
+  });
+}
+
+setupAutocomplete('routeFrom', 'routeFromList');
+setupAutocomplete('routeTo', 'routeToList');
+
 function countCamerasNearRoute(coords){
   const activeCams = entries.filter(e => e.status === 'active').map(getCoords).filter(Boolean);
   let count = 0;
@@ -1217,7 +1291,10 @@ findRouteBtn.addEventListener('click', async () => {
   findRouteBtn.disabled = true;
 
   try{
-    const [start, end] = await Promise.all([geocode(fromQ), geocode(toQ)]);
+    const [start, end] = await Promise.all([
+      (routeFrom.dataset.lat && routeFrom.dataset.label === fromQ) ? { lat: Number(routeFrom.dataset.lat), lng: Number(routeFrom.dataset.lng) } : geocode(fromQ),
+      (routeTo.dataset.lat && routeTo.dataset.label === toQ) ? { lat: Number(routeTo.dataset.lat), lng: Number(routeTo.dataset.lng) } : geocode(toQ)
+    ]);
     if(!start || !end){
       routeResults.innerHTML = '<p class="route-note">Couldn\'t find one of those addresses — try being more specific.</p>';
       findRouteBtn.disabled = false;
