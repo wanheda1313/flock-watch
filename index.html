@@ -426,6 +426,35 @@
   }
   .about-section h2{font-family:var(--font-display);font-size:1rem;color:#fff;margin:0 0 10px;}
 
+  .autofill-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:18px 20px;
+    margin-bottom:22px;
+  }
+  .autofill-progress{
+    background:rgba(255,255,255,0.05);
+    border-radius:999px;
+    height:8px;
+    overflow:hidden;
+    margin:12px 0;
+  }
+  .autofill-progress-bar{
+    height:100%;
+    background:linear-gradient(90deg, var(--accent2), var(--accent-bright));
+    width:0%;
+    transition:width 0.3s ease;
+  }
+  .autofill-log{
+    max-height:160px;
+    overflow-y:auto;
+    font-size:0.78rem;
+    color:var(--text-soft);
+    margin-top:10px;
+  }
+  .autofill-log div{padding:2px 0;}
+
   /* ---- Tabs ---- */
   .tab-bar{
     display:flex;
@@ -621,6 +650,20 @@
   </div>
 
   <div class="tab-panel" id="tabLog">
+
+  <div class="autofill-card">
+    <div class="section-title" style="margin-bottom:6px;">Auto-fill cross streets</div>
+    <div class="route-note">Finds every entry still showing raw coordinates and looks up real cross streets one at a time, respecting the free geocoder's rate limit (~1 lookup/sec). This takes a while for hundreds of entries — leave this tab open while it runs. Anything ambiguous gets skipped for manual review instead of guessed.</div>
+    <div class="route-inputs" style="margin-top:10px;">
+      <button class="btn" id="autofillStartBtn">🪄 Start auto-fill</button>
+      <button class="btn secondary" id="autofillStopBtn" style="display:none;">Stop</button>
+    </div>
+    <div class="autofill-progress" id="autofillProgressWrap" style="display:none;">
+      <div class="autofill-progress-bar" id="autofillProgressBar"></div>
+    </div>
+    <div id="autofillStatus" class="route-note" style="margin-top:8px;"></div>
+    <div class="autofill-log" id="autofillLog"></div>
+  </div>
 
   <div class="controls">
     <input type="text" id="searchInput" placeholder="Search by location or notes…">
@@ -1659,6 +1702,89 @@ findRouteBtn.addEventListener('click', async () => {
 
 initMap();
 loadEntries();
+
+/* ---- Batch auto-fill cross streets (owner-run, rate-limited to respect free geocoder policy) ---- */
+const autofillStartBtn = document.getElementById('autofillStartBtn');
+const autofillStopBtn = document.getElementById('autofillStopBtn');
+const autofillProgressWrap = document.getElementById('autofillProgressWrap');
+const autofillProgressBar = document.getElementById('autofillProgressBar');
+const autofillStatus = document.getElementById('autofillStatus');
+const autofillLog = document.getElementById('autofillLog');
+let autofillRunning = false;
+
+function looksLikeRawCoords(location){
+  return /^[^,]+,\s*CA\s*—\s*-?\d{1,3}\.\d+,\s*-?\d{1,3}\.\d+/.test(location || '') ||
+         /-?\d{1,3}\.\d+\s*,\s*-?\d{1,3}\.\d+/.test(location || '');
+}
+
+function logAutofill(msg){
+  const line = document.createElement('div');
+  line.textContent = msg;
+  autofillLog.prepend(line);
+}
+
+autofillStartBtn.addEventListener('click', async () => {
+  const targets = entries.filter(e => looksLikeRawCoords(e.location) && getCoords(e));
+  if(targets.length === 0){
+    autofillStatus.textContent = 'Nothing to do — every entry already has a non-coordinate location.';
+    return;
+  }
+  if(!confirm(`This will look up ${targets.length} entries, about ${Math.ceil(targets.length * 1.2 / 60)} minutes. Keep this tab open while it runs. Start?`)) return;
+
+  autofillRunning = true;
+  autofillStartBtn.style.display = 'none';
+  autofillStopBtn.style.display = 'inline-block';
+  autofillProgressWrap.style.display = 'block';
+  autofillLog.innerHTML = '';
+
+  let done = 0, updated = 0, skipped = 0;
+  for(const entry of targets){
+    if(!autofillRunning) break;
+    const coords = getCoords(entry);
+    autofillStatus.textContent = `Looking up ${done + 1} of ${targets.length}…`;
+    try{
+      const [streets, geoRes] = await Promise.all([
+        findNearestCrossStreets(coords[0], coords[1]).catch(() => []),
+        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}&zoom=17&addressdetails=1`).then(r => r.json()).catch(() => null)
+      ]);
+      const addr = (geoRes && geoRes.address) || {};
+      const city = entry.city || addr.city || addr.town || addr.village || '';
+
+      if(streets.length >= 2){
+        const suggestion = city ? `${streets[0]} & ${streets[1]}, ${city}, CA` : `${streets[0]} & ${streets[1]}`;
+        entry.location = suggestion;
+        if(city && !entry.city) entry.city = city;
+        entry.updatedAt = new Date().toISOString();
+        await updateEntryRow(entry);
+        updated++;
+        logAutofill(`✓ ${suggestion}`);
+      }else{
+        skipped++;
+        logAutofill(`— skipped (not enough nearby streets found)`);
+      }
+    }catch(err){
+      skipped++;
+      logAutofill(`— skipped (lookup error)`);
+    }
+    done++;
+    autofillProgressBar.style.width = `${Math.round((done / targets.length) * 100)}%`;
+    await new Promise(r => setTimeout(r, 1200));
+  }
+
+  render();
+  renderMap(null);
+  autofillStatus.textContent = `Done — ${updated} updated, ${skipped} skipped out of ${done} checked.`;
+  autofillStartBtn.style.display = 'inline-block';
+  autofillStopBtn.style.display = 'none';
+  autofillRunning = false;
+});
+
+autofillStopBtn.addEventListener('click', () => {
+  autofillRunning = false;
+  autofillStatus.textContent = 'Stopped — you can resume later, it\'ll pick up remaining unconverted entries.';
+  autofillStartBtn.style.display = 'inline-block';
+  autofillStopBtn.style.display = 'none';
+});
 
 /* ---- Cameras near me ---- */
 const nearMeBtn = document.getElementById('nearMeBtn');
