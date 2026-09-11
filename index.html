@@ -307,6 +307,44 @@
     padding:3px 10px;
   }
   .entry-tag.agency{color:var(--accent2);border-color:rgba(45,212,191,0.3);}
+
+  /* ---- Route planner ---- */
+  .route-card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:20px;
+    margin-bottom:22px;
+  }
+  .route-inputs{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:10px;}
+  .route-inputs input[type="text"]{flex:1 1 220px;}
+  .route-note{font-size:0.8rem;color:var(--text-soft);margin:8px 0 4px;}
+  .route-options{display:flex;flex-direction:column;gap:8px;margin-top:14px;}
+  .route-option{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    background:rgba(255,255,255,0.03);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+    cursor:pointer;
+    transition:border-color 0.15s ease, background 0.15s ease;
+  }
+  .route-option:hover{border-color:var(--accent2);}
+  .route-option.selected{border-color:var(--accent2);background:var(--accent2-soft);}
+  .route-option .route-label{font-family:var(--font-display);font-weight:700;color:#fff;font-size:0.92rem;}
+  .route-option .route-meta{font-size:0.8rem;color:var(--text-soft);margin-top:2px;}
+  .route-option .route-cam-count{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:0.85rem;
+    padding:4px 12px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .route-cam-count.best{background:var(--accent2-soft);color:var(--accent2);}
+  .route-cam-count.worse{background:rgba(245,158,11,0.14);color:#F59E0B;}
   .status-pill{
     display:inline-block;
     font-family:var(--font-display);
@@ -416,6 +454,17 @@
     <button class="btn secondary" id="playBtn">▶ Play growth</button>
     <input type="range" id="timelineSlider" min="0" max="100" value="100">
     <span class="timeline-date" id="timelineDate">All time</span>
+  </div>
+
+  <div class="route-card">
+    <div class="section-title" style="margin-bottom:10px;">Plan a route</div>
+    <div class="route-inputs">
+      <input type="text" id="routeFrom" placeholder="From (address or intersection)">
+      <input type="text" id="routeTo" placeholder="To (address or intersection)">
+      <button class="btn" id="findRouteBtn">Find routes</button>
+    </div>
+    <div class="route-note">Shows a few real driving routes and how many documented cameras each one passes near — not a guaranteed camera-free path, since this only knows about cameras logged here.</div>
+    <div id="routeResults"></div>
   </div>
 
   <div class="controls">
@@ -1008,6 +1057,111 @@ function render(){
 searchInput.addEventListener('input', render);
 statusFilter.addEventListener('change', render);
 cityFilter.addEventListener('change', render);
+
+/* ---- Route planner ---- */
+const routeFrom = document.getElementById('routeFrom');
+const routeTo = document.getElementById('routeTo');
+const findRouteBtn = document.getElementById('findRouteBtn');
+const routeResults = document.getElementById('routeResults');
+let routeLayer = null;
+let routeOptionsData = [];
+
+function haversineMeters(lat1, lng1, lat2, lng2){
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+async function geocode(query){
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if(!data || data.length === 0) return null;
+  return { lat: Number(data[0].lat), lng: Number(data[0].lon) };
+}
+
+function countCamerasNearRoute(coords){
+  const activeCams = entries.filter(e => e.status === 'active').map(getCoords).filter(Boolean);
+  let count = 0;
+  const step = Math.max(1, Math.floor(coords.length / 200));
+  for(let i = 0; i < coords.length; i += step){
+    const [lng, lat] = coords[i];
+    for(const [clat, clng] of activeCams){
+      if(haversineMeters(lat, lng, clat, clng) < 120){
+        count++;
+        break;
+      }
+    }
+  }
+  return count;
+}
+
+function drawRoute(coords, color){
+  if(routeLayer) map.removeLayer(routeLayer);
+  const latlngs = coords.map(c => [c[1], c[0]]);
+  routeLayer = L.polyline(latlngs, { color, weight: 5, opacity: 0.85 }).addTo(map);
+  map.fitBounds(routeLayer.getBounds(), { padding: [40,40] });
+}
+
+function selectRoute(idx){
+  const opts = document.querySelectorAll('.route-option');
+  opts.forEach((el,i) => el.classList.toggle('selected', i === idx));
+  const r = routeOptionsData[idx];
+  drawRoute(r.coords, idx === routeOptionsData.bestIdx ? '#2DD4BF' : '#F59E0B');
+}
+
+findRouteBtn.addEventListener('click', async () => {
+  const fromQ = routeFrom.value.trim();
+  const toQ = routeTo.value.trim();
+  if(!fromQ || !toQ) return;
+  routeResults.innerHTML = '<p class="route-note">Looking up addresses and routes…</p>';
+  findRouteBtn.disabled = true;
+
+  try{
+    const [start, end] = await Promise.all([geocode(fromQ), geocode(toQ)]);
+    if(!start || !end){
+      routeResults.innerHTML = '<p class="route-note">Couldn\'t find one of those addresses — try being more specific.</p>';
+      findRouteBtn.disabled = false;
+      return;
+    }
+    const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${end.lng},${end.lat}?alternatives=true&overview=full&geometries=geojson`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if(!data.routes || data.routes.length === 0){
+      routeResults.innerHTML = '<p class="route-note">No driving route found between those points.</p>';
+      findRouteBtn.disabled = false;
+      return;
+    }
+
+    routeOptionsData = data.routes.map(r => ({
+      coords: r.geometry.coordinates,
+      minutes: Math.round(r.duration / 60),
+      miles: (r.distance / 1609.34).toFixed(1),
+      camCount: countCamerasNearRoute(r.geometry.coordinates)
+    }));
+    let bestIdx = 0;
+    routeOptionsData.forEach((r,i) => { if(r.camCount < routeOptionsData[bestIdx].camCount) bestIdx = i; });
+    routeOptionsData.bestIdx = bestIdx;
+
+    routeResults.innerHTML = `<div class="route-options">${routeOptionsData.map((r,i) => `
+      <div class="route-option" onclick="selectRoute(${i})">
+        <div>
+          <div class="route-label">Route ${i+1}${i === bestIdx ? ' — fewest cameras' : ''}</div>
+          <div class="route-meta">${r.minutes} min · ${r.miles} mi</div>
+        </div>
+        <span class="route-cam-count ${i === bestIdx ? 'best' : 'worse'}">${r.camCount} camera${r.camCount === 1 ? '' : 's'}</span>
+      </div>
+    `).join('')}</div>`;
+
+    selectRoute(bestIdx);
+  }catch(err){
+    routeResults.innerHTML = '<p class="route-note">Something went wrong finding routes — try again in a moment.</p>';
+  }
+  findRouteBtn.disabled = false;
+});
 
 initMap();
 loadEntries();
