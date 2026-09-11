@@ -97,6 +97,8 @@
   }
   .stat-badge strong{font-family:var(--font-display);font-size:1.4rem;line-height:1;}
   .stat-badge span{font-size:0.6rem;text-transform:uppercase;letter-spacing:0.05em;opacity:0.85;margin-top:2px;}
+  #statLastReported{font-size:0.85rem !important;}
+  .last-reported{font-size:0.78rem;color:var(--text-soft);margin-top:12px;}
 
   /* ---- Content ---- */
   .content{max-width:1200px;margin:0 auto;padding:28px 28px 90px;}
@@ -143,15 +145,21 @@
     font-weight:800;
     box-shadow:0 0 0 1px rgba(255,255,255,0.15), 0 0 14px rgba(45,212,191,0.55);
   }
-  .popup-status{font-family:var(--font-display);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:4px;}
-  .popup-status.active{color:var(--accent2);}
-  .popup-status.removed{color:#F59E0B;}
-  .popup-actions{margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;}
-  .popup-actions button{
+  .popup-cam-number{font-family:var(--font-display);font-weight:800;font-size:0.85rem;color:#fff;margin-bottom:6px;letter-spacing:0.02em;}
+  .popup-location{font-size:0.88rem;font-weight:600;color:var(--text);}
+  .popup-city{font-size:0.78rem;color:var(--text-soft);margin-bottom:8px;}
+  .popup-detail-row{display:flex;justify-content:space-between;gap:10px;font-size:0.78rem;padding:3px 0;border-bottom:1px solid var(--border);color:var(--text-soft);}
+  .popup-detail-row span:first-child{white-space:nowrap;}
+  .popup-detail-row span:last-child{text-align:right;color:var(--text);}
+  .popup-status-val{font-family:var(--font-display);font-weight:700;}
+  .popup-observed{font-size:0.82rem;color:var(--text);margin-top:8px;line-height:1.4;}
+  .popup-actions{margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+  .popup-actions a, .popup-actions button{
     font-family:var(--font-body);font-size:0.8rem;font-weight:500;
     background:none;border:none;color:var(--accent-bright);cursor:pointer;
-    padding:0;
+    padding:0;text-decoration:none;
   }
+  .popup-actions a:hover, .popup-actions button:hover{text-decoration:underline;}
 
   /* ---- Timeline controls ---- */
   .timeline-bar{
@@ -386,6 +394,38 @@
   .nearby-list{margin-top:8px;font-size:0.84rem;color:var(--text-soft);}
   .nearby-list div{padding:3px 0;}
 
+  .recent-table{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:18px 20px;
+    margin-bottom:22px;
+  }
+  .recent-row{
+    display:grid;
+    grid-template-columns:1fr auto auto;
+    gap:12px;
+    align-items:center;
+    padding:9px 0;
+    border-bottom:1px solid var(--border);
+    font-size:0.86rem;
+  }
+  .recent-row:last-child{border-bottom:none;}
+  .recent-row .recent-loc{color:var(--text);}
+  .recent-row .recent-when{color:var(--text-soft);font-size:0.78rem;white-space:nowrap;}
+
+  .about-section{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:22px;
+    margin-top:32px;
+    font-size:0.88rem;
+    color:var(--text-soft);
+    line-height:1.6;
+  }
+  .about-section h2{font-family:var(--font-display);font-size:1rem;color:#fff;margin:0 0 10px;}
+
   /* ---- Tabs ---- */
   .tab-bar{
     display:flex;
@@ -443,6 +483,8 @@
   }
   .status-pill.active{background:var(--accent-soft);color:var(--accent-bright);}
   .status-pill.removed{background:var(--slate-soft);color:var(--slate);}
+  .status-pill.unknown{background:rgba(245,158,11,0.14);color:#F59E0B;}
+  .status-pill.relocated{background:rgba(167,139,250,0.14);color:#A78BFA;}
   .entry-actions{
     display:flex;
     flex-direction:column;
@@ -522,11 +564,12 @@
     <h1>FLOCK WATCH</h1>
     <div class="tagline">Where the license-plate cameras are, who's seen them, and whether they're still standing.</div>
     <div class="stat-row" id="statRow">
-      <div class="stat-badge"><strong id="statTotal">0</strong><span>on file</span></div>
+      <div class="stat-badge"><strong id="statTotal">0</strong><span>tracked</span></div>
       <div class="stat-badge"><strong id="statActive">0</strong><span>active</span></div>
-      <div class="stat-badge slate"><strong id="statFiled">0</strong><span>filed</span></div>
       <div class="stat-badge teal"><strong id="statCities">0</strong><span>cities</span></div>
+      <div class="stat-badge slate"><strong id="statLastReported">—</strong><span>last report</span></div>
     </div>
+    <div class="last-reported" id="lastReported"></div>
   </div>
 </div>
 
@@ -572,6 +615,9 @@
     <div id="routeResults"></div>
   </div>
 
+  <div class="section-title">Recently reported</div>
+  <div class="recent-table" id="recentTable"></div>
+
   </div>
 
   <div class="tab-panel" id="tabLog">
@@ -584,6 +630,8 @@
     <select id="statusFilter">
       <option value="all">All statuses</option>
       <option value="active">Active only</option>
+      <option value="unknown">Unknown only</option>
+      <option value="relocated">Relocated only</option>
       <option value="removed">Removed only</option>
     </select>
     <button class="btn" id="toggleFormBtn">+ File a sighting</button>
@@ -610,6 +658,8 @@
         <label for="fStatus">Status</label>
         <select id="fStatus">
           <option value="active">Active</option>
+          <option value="unknown">Unknown</option>
+          <option value="relocated">Relocated</option>
           <option value="removed">Removed</option>
         </select>
       </div>
@@ -671,6 +721,11 @@
 
   </div>
 
+  <div class="about-section">
+    <h2>About This Map</h2>
+    <p>Flock Watch is a community-maintained record of publicly observed license-plate cameras. Information is submitted by users and may change over time. Camera locations, statuses, and operating agencies should be independently verified before being relied upon. "Community Confirmed" and similar labels reflect confirm/dispute activity from people using this page — they are not official verification by any agency.</p>
+  </div>
+
 </div>
 
 <script>
@@ -685,7 +740,6 @@ const listContainer = document.getElementById('listContainer');
 const agencyContainer = document.getElementById('agencyContainer');
 const statTotal = document.getElementById('statTotal');
 const statActive = document.getElementById('statActive');
-const statFiled = document.getElementById('statFiled');
 const statCities = document.getElementById('statCities');
 const formPanel = document.getElementById('formPanel');
 const toggleFormBtn = document.getElementById('toggleFormBtn');
@@ -698,11 +752,48 @@ const timelineSlider = document.getElementById('timelineSlider');
 const timelineDate = document.getElementById('timelineDate');
 const playBtn = document.getElementById('playBtn');
 
+function statusMeta(status){
+  const map = {
+    active:    { label: 'Active',    color: '#2DD4BF' },
+    unknown:   { label: 'Unknown',   color: '#F59E0B' },
+    relocated: { label: 'Relocated', color: '#A78BFA' },
+    removed:   { label: 'Removed',   color: '#64748B' }
+  };
+  return map[status] || map.active;
+}
+
+function verificationMeta(entry){
+  const c = entry.confirmedCount || 0;
+  const d = entry.disputedCount || 0;
+  if(d > c && d > 0) return { label: '🔴 Disputed', note: `${d} dispute${d===1?'':'s'}` };
+  if(c >= 2) return { label: '🟢 Community Confirmed', note: `${c} confirmations` };
+  if(c === 1) return { label: '🟡 Community Reported', note: '1 confirmation' };
+  return { label: '⚪ Unverified', note: 'no community confirmations yet' };
+}
+
 function fmtDate(iso){
   if(!iso) return '—';
   const d = new Date(iso + 'T00:00:00');
   if(isNaN(d)) return iso;
   return d.toLocaleDateString(undefined, {year:'numeric', month:'short', day:'numeric'});
+}
+
+function fmtRelative(iso){
+  if(!iso) return null;
+  const then = new Date(iso.includes('T') ? iso : iso + 'T00:00:00');
+  if(isNaN(then)) return null;
+  const diffMs = Date.now() - then.getTime();
+  const diffMin = Math.round(diffMs / 60000);
+  const diffHr = Math.round(diffMin / 60);
+  const diffDay = Math.round(diffHr / 24);
+  if(diffMin < 1) return 'just now';
+  if(diffMin < 60) return `${diffMin} min ago`;
+  if(diffHr < 24) return `${diffHr} hr ago`;
+  if(diffDay === 1) return 'yesterday';
+  if(diffDay < 30) return `${diffDay} days ago`;
+  const diffMonth = Math.round(diffDay / 30);
+  if(diffMonth < 12) return `${diffMonth} mo ago`;
+  return `${Math.round(diffMonth / 12)} yr ago`;
 }
 
 function switchTab(tab){
@@ -878,16 +969,48 @@ function initMap(){
   }).addTo(map);
 }
 
+function computeCameraNumbers(){
+  const sorted = [...entries].sort((a,b) => (a.date || '').localeCompare(b.date || '') || a.id.localeCompare(b.id));
+  const map = {};
+  sorted.forEach((e,i) => { map[e.id] = i + 1; });
+  return map;
+}
+
+function buildDetailCardHtml(e, cameraNumber){
+  const meta = statusMeta(e.status);
+  const verif = verificationMeta(e);
+  const coords = getCoords(e);
+  const mapLink = coords ? `https://www.google.com/maps/search/?api=1&query=${coords[0]},${coords[1]}` : null;
+  const lastConfirmedText = e.lastVerified ? `${fmtDate(e.lastVerified)} (${fmtRelative(e.lastVerified)})` : 'not yet confirmed';
+  return `
+    <div class="popup-cam-number">FLOCK CAMERA #${String(cameraNumber).padStart(3,'0')}</div>
+    <div class="popup-location">📍 ${escapeHtml(e.location)}</div>
+    ${e.city ? `<div class="popup-city">${escapeHtml(e.city)}, CA</div>` : ''}
+    <div class="popup-detail-row"><span>Status</span><span class="popup-status-val" style="color:${meta.color};">${meta.label}</span></div>
+    <div class="popup-detail-row"><span>First reported</span><span>${fmtDate(e.date)}</span></div>
+    <div class="popup-detail-row"><span>Last confirmed</span><span>${lastConfirmedText}</span></div>
+    ${e.agency ? `<div class="popup-detail-row"><span>Agency</span><span>${escapeHtml(e.agency)}</span></div>` : ''}
+    <div class="popup-detail-row"><span>Community check</span><span>${verif.label}</span></div>
+    ${(e.photo || e.notes) ? `<div class="popup-observed"><strong>What was observed:</strong><br>${escapeHtml(e.photo || e.notes)}</div>` : ''}
+    <div class="popup-actions">
+      ${mapLink ? `<a href="${mapLink}" target="_blank" rel="noopener">View on Google Maps ↗</a>` : ''}
+      <button onclick="confirmEntry('${e.id}')">✓ Still there</button>
+      <button onclick="editEntry('${e.id}')">Edit</button>
+    </div>
+  `;
+}
+
 function renderMap(cutoffDate){
   if(!map) return;
   markerLayer.clearLayers();
   const bounds = [];
+  const cameraNumbers = computeCameraNumbers();
   entries.forEach(e => {
     if(cutoffDate && e.date && e.date > cutoffDate) return;
     const coords = getCoords(e);
     if(!coords) return;
     bounds.push(coords);
-    const color = e.status === 'active' ? '#2DD4BF' : '#F59E0B';
+    const color = statusMeta(e.status).color;
     const marker = L.circleMarker(coords, {
       radius: 7,
       color: '#0B1A18',
@@ -895,15 +1018,7 @@ function renderMap(cutoffDate){
       fillColor: color,
       fillOpacity: 0.9
     });
-    marker.bindPopup(`
-      <span class="popup-status ${e.status}">${e.status === 'active' ? 'Active' : 'Filed'}</span>
-      <strong>${escapeHtml(e.location)}</strong><br>
-      ${e.notes ? escapeHtml(e.notes).slice(0,120) : ''}
-      <div class="popup-actions">
-        <button onclick="toggleStatus('${e.id}')">Mark ${e.status === 'active' ? 'filed' : 'active'}</button>
-        <button onclick="editEntry('${e.id}')">Edit</button>
-      </div>
-    `);
+    marker.bindPopup(buildDetailCardHtml(e, cameraNumbers[e.id]), { maxWidth: 300 });
     markerLayer.addLayer(marker);
   });
   if(!cutoffDate && bounds.length > 0){
@@ -1081,6 +1196,16 @@ saveEntryBtn.addEventListener('click', async () => {
   saveEntryBtn.disabled = false;
 });
 
+async function setStatus(id, newStatus){
+  const idx = entries.findIndex(e => e.id === id);
+  if(idx === -1) return;
+  entries[idx].status = newStatus;
+  entries[idx].updatedAt = new Date().toISOString();
+  render();
+  renderMap(null);
+  await updateEntryRow(entries[idx]);
+}
+
 async function toggleStatus(id){
   const idx = entries.findIndex(e => e.id === id);
   if(idx === -1) return;
@@ -1155,15 +1280,46 @@ function renderAgencies(){
   `).join('');
 }
 
+function renderRecentTable(){
+  const recentEl = document.getElementById('recentTable');
+  const recent = [...entries]
+    .filter(e => e.updatedAt || e.date)
+    .sort((a,b) => (b.updatedAt || b.date || '').localeCompare(a.updatedAt || a.date || ''))
+    .slice(0, 6);
+  if(recent.length === 0){
+    recentEl.innerHTML = '<p class="agency-empty">Nothing reported yet.</p>';
+    return;
+  }
+  recentEl.innerHTML = recent.map(e => {
+    const meta = statusMeta(e.status);
+    const when = e.updatedAt ? fmtRelative(e.updatedAt) : fmtDate(e.date);
+    return `
+      <div class="recent-row">
+        <span class="recent-loc">${escapeHtml(e.location)}</span>
+        <span class="status-pill ${e.status}">${meta.label}</span>
+        <span class="recent-when">${when}</span>
+      </div>
+    `;
+  }).join('');
+}
+
 function render(){
   const filtered = getFiltered();
   const activeCount = entries.filter(e => e.status === 'active').length;
   const cityCount = new Set(entries.map(e => e.city).filter(Boolean)).size;
   statTotal.textContent = entries.length;
   statActive.textContent = activeCount;
-  statFiled.textContent = entries.length - activeCount;
   statCities.textContent = cityCount;
+
+  const sortedByDate = entries.filter(e => e.date).sort((a,b) => b.date.localeCompare(a.date));
+  document.getElementById('statLastReported').textContent = sortedByDate.length ? fmtDate(sortedByDate[0].date) : '—';
+
+  const sortedByUpdated = entries.filter(e => e.updatedAt).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
+  const lastReportedEl = document.getElementById('lastReported');
+  lastReportedEl.textContent = sortedByUpdated.length ? `Updated ${fmtRelative(sortedByUpdated[0].updatedAt)}` : '';
+
   renderAgencies();
+  renderRecentTable();
 
   const paginationBar = document.getElementById('paginationBar');
 
@@ -1198,6 +1354,8 @@ function render(){
     ${pageItems.map(e => {
       const coords = getCoords(e);
       const mapLink = coords ? `https://www.google.com/maps/search/?api=1&query=${coords[0]},${coords[1]}` : null;
+      const meta = statusMeta(e.status);
+      const verif = verificationMeta(e);
       return `
       <div class="entry">
         <div class="entry-body">
@@ -1209,15 +1367,20 @@ function render(){
             ${e.city ? `<span class="entry-tag">${escapeHtml(e.city)}</span>` : ''}
             ${e.agency ? `<span class="entry-tag agency">${escapeHtml(e.agency)}</span>` : ''}
             ${e.reporter ? `<span class="entry-tag">Reported by ${escapeHtml(e.reporter)}</span>` : ''}
-            ${(e.confirmedCount || e.disputedCount) ? `<span class="entry-tag">${e.confirmedCount || 0} confirmed · ${e.disputedCount || 0} disputed${e.lastVerified ? ` · last checked ${fmtDate(e.lastVerified)}` : ''}</span>` : ''}
+            <span class="entry-tag">${verif.label}${e.lastVerified ? ` · last checked ${fmtRelative(e.lastVerified)}` : ''}</span>
           </div>
         </div>
         <div class="entry-actions">
-          <span class="status-pill ${e.status}">${e.status === 'active' ? 'Active' : 'Filed'}</span>
+          <span class="status-pill ${e.status}">${meta.label}</span>
+          <select class="link-btn" style="background:transparent;border:1px solid var(--border);border-radius:6px;padding:3px 6px;" onchange="setStatus('${e.id}', this.value)">
+            <option value="active" ${e.status==='active'?'selected':''}>Active</option>
+            <option value="unknown" ${e.status==='unknown'?'selected':''}>Unknown</option>
+            <option value="relocated" ${e.status==='relocated'?'selected':''}>Relocated</option>
+            <option value="removed" ${e.status==='removed'?'selected':''}>Removed</option>
+          </select>
           ${mapLink ? `<a class="link-btn" href="${mapLink}" target="_blank" rel="noopener">View on map ↗</a>` : ''}
           <button class="link-btn" onclick="confirmEntry('${e.id}')">✓ Still there</button>
           <button class="link-btn" onclick="disputeEntry('${e.id}')">✗ Not there</button>
-          <button class="link-btn" onclick="toggleStatus('${e.id}')">Mark ${e.status === 'active' ? 'filed' : 'active'}</button>
           <button class="link-btn" onclick="editEntry('${e.id}')">Edit</button>
         </div>
       </div>
