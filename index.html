@@ -348,11 +348,12 @@
     display:flex;
     justify-content:space-between;
     align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
     background:rgba(255,255,255,0.03);
     border:1px solid var(--border);
     border-radius:10px;
     padding:12px 14px;
-    cursor:pointer;
     transition:border-color 0.15s ease, background 0.15s ease;
   }
   .route-option:hover{border-color:var(--accent2);}
@@ -369,6 +370,21 @@
   }
   .route-cam-count.best{background:var(--accent2-soft);color:var(--accent2);}
   .route-cam-count.worse{background:rgba(245,158,11,0.14);color:#F59E0B;}
+
+  .map-toolbar{display:flex;justify-content:flex-end;margin:-10px 0 12px;}
+  .nearby-readout{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px 16px;
+    margin-bottom:22px;
+    font-size:0.9rem;
+    display:none;
+  }
+  .nearby-readout.visible{display:block;}
+  .nearby-readout strong{color:var(--accent2);font-family:var(--font-display);}
+  .nearby-list{margin-top:8px;font-size:0.84rem;color:var(--text-soft);}
+  .nearby-list div{padding:3px 0;}
 
   /* ---- Tabs ---- */
   .tab-bar{
@@ -524,6 +540,12 @@
   </div>
 
   <div class="tab-panel active" id="tabMap">
+
+  <div class="map-toolbar">
+    <button class="btn secondary" id="nearMeBtn">📍 Cameras near me</button>
+  </div>
+
+  <div class="nearby-readout" id="nearbyReadout"></div>
 
   <div id="mapContainer"></div>
 
@@ -796,6 +818,9 @@ function rowToEntry(row){
     notes: row.notes,
     lat: row.lat,
     lng: row.lng,
+    confirmedCount: row.confirmed_count || 0,
+    disputedCount: row.disputed_count || 0,
+    lastVerified: row.last_verified,
     updatedAt: row.updated_at
   };
 }
@@ -813,6 +838,9 @@ function entryToRow(entry){
     notes: entry.notes,
     lat: entry.lat != null && entry.lat !== '' ? Number(entry.lat) : null,
     lng: entry.lng != null && entry.lng !== '' ? Number(entry.lng) : null,
+    confirmed_count: entry.confirmedCount || 0,
+    disputed_count: entry.disputedCount || 0,
+    last_verified: entry.lastVerified || null,
     updated_at: entry.updatedAt
   };
 }
@@ -1078,6 +1106,24 @@ function editEntry(id){
   if(entry) openForm(entry);
 }
 
+async function confirmEntry(id){
+  const idx = entries.findIndex(e => e.id === id);
+  if(idx === -1) return;
+  entries[idx].confirmedCount = (entries[idx].confirmedCount || 0) + 1;
+  entries[idx].lastVerified = new Date().toISOString().slice(0,10);
+  render();
+  await updateEntryRow(entries[idx]);
+}
+
+async function disputeEntry(id){
+  const idx = entries.findIndex(e => e.id === id);
+  if(idx === -1) return;
+  entries[idx].disputedCount = (entries[idx].disputedCount || 0) + 1;
+  entries[idx].lastVerified = new Date().toISOString().slice(0,10);
+  render();
+  await updateEntryRow(entries[idx]);
+}
+
 function getFiltered(){
   const q = searchInput.value.trim().toLowerCase();
   const statusVal = statusFilter.value;
@@ -1163,11 +1209,14 @@ function render(){
             ${e.city ? `<span class="entry-tag">${escapeHtml(e.city)}</span>` : ''}
             ${e.agency ? `<span class="entry-tag agency">${escapeHtml(e.agency)}</span>` : ''}
             ${e.reporter ? `<span class="entry-tag">Reported by ${escapeHtml(e.reporter)}</span>` : ''}
+            ${(e.confirmedCount || e.disputedCount) ? `<span class="entry-tag">${e.confirmedCount || 0} confirmed · ${e.disputedCount || 0} disputed${e.lastVerified ? ` · last checked ${fmtDate(e.lastVerified)}` : ''}</span>` : ''}
           </div>
         </div>
         <div class="entry-actions">
           <span class="status-pill ${e.status}">${e.status === 'active' ? 'Active' : 'Filed'}</span>
           ${mapLink ? `<a class="link-btn" href="${mapLink}" target="_blank" rel="noopener">View on map ↗</a>` : ''}
+          <button class="link-btn" onclick="confirmEntry('${e.id}')">✓ Still there</button>
+          <button class="link-btn" onclick="disputeEntry('${e.id}')">✗ Not there</button>
           <button class="link-btn" onclick="toggleStatus('${e.id}')">Mark ${e.status === 'active' ? 'filed' : 'active'}</button>
           <button class="link-btn" onclick="editEntry('${e.id}')">Edit</button>
           <button class="link-btn danger" onclick="deleteEntry('${e.id}')">Delete</button>
@@ -1276,6 +1325,26 @@ function drawRoute(coords, color){
   map.fitBounds(routeLayer.getBounds(), { padding: [40,40] });
 }
 
+function googleMapsUrl(start, end, coords){
+  // Sample a few waypoints along the route so Google is nudged toward the same path
+  const waypointCount = 3;
+  const step = Math.floor(coords.length / (waypointCount + 1));
+  const waypoints = [];
+  for(let i = 1; i <= waypointCount; i++){
+    const idx = step * i;
+    if(coords[idx]) waypoints.push(`${coords[idx][1]},${coords[idx][0]}`);
+  }
+  const params = new URLSearchParams({
+    api: '1',
+    origin: `${start.lat},${start.lng}`,
+    destination: `${end.lat},${end.lng}`,
+    travelmode: 'driving'
+  });
+  let url = `https://www.google.com/maps/dir/?${params.toString()}`;
+  if(waypoints.length) url += `&waypoints=${waypoints.join('|')}`;
+  return url;
+}
+
 function selectRoute(idx){
   const opts = document.querySelectorAll('.route-option');
   opts.forEach((el,i) => el.classList.toggle('selected', i === idx));
@@ -1320,11 +1389,12 @@ findRouteBtn.addEventListener('click', async () => {
     routeOptionsData.bestIdx = bestIdx;
 
     routeResults.innerHTML = `<div class="route-options">${routeOptionsData.map((r,i) => `
-      <div class="route-option" onclick="selectRoute(${i})">
-        <div>
+      <div class="route-option">
+        <div onclick="selectRoute(${i})" style="flex:1;cursor:pointer;">
           <div class="route-label">Route ${i+1}${i === bestIdx ? ' — fewest cameras' : ''}</div>
           <div class="route-meta">${r.minutes} min · ${r.miles} mi</div>
         </div>
+        <a class="link-btn" href="${googleMapsUrl(start, end, r.coords)}" target="_blank" rel="noopener" onclick="event.stopPropagation();">Open in Google Maps ↗</a>
         <span class="route-cam-count ${i === bestIdx ? 'best' : 'worse'}">${r.camCount} camera${r.camCount === 1 ? '' : 's'}</span>
       </div>
     `).join('')}</div>`;
@@ -1338,6 +1408,56 @@ findRouteBtn.addEventListener('click', async () => {
 
 initMap();
 loadEntries();
+
+/* ---- Cameras near me ---- */
+const nearMeBtn = document.getElementById('nearMeBtn');
+const nearbyReadout = document.getElementById('nearbyReadout');
+let myLocationMarker = null;
+
+nearMeBtn.addEventListener('click', () => {
+  if(!navigator.geolocation){
+    nearbyReadout.innerHTML = 'Your browser doesn\'t support location lookup.';
+    nearbyReadout.classList.add('visible');
+    return;
+  }
+  nearMeBtn.disabled = true;
+  nearMeBtn.textContent = 'Locating…';
+  navigator.geolocation.getCurrentPosition((pos) => {
+    const { latitude, longitude } = pos.coords;
+    const activeCams = entries.filter(e => e.status === 'active');
+    const withDist = activeCams.map(e => {
+      const coords = getCoords(e);
+      if(!coords) return null;
+      const distMeters = haversineMeters(latitude, longitude, coords[0], coords[1]);
+      return { entry: e, coords, miles: distMeters / 1609.34 };
+    }).filter(Boolean).sort((a,b) => a.miles - b.miles);
+
+    const within1mi = withDist.filter(d => d.miles <= 1);
+    const within3mi = withDist.filter(d => d.miles <= 3);
+
+    if(myLocationMarker) map.removeLayer(myLocationMarker);
+    myLocationMarker = L.circleMarker([latitude, longitude], {
+      radius: 9, color: '#fff', weight: 2, fillColor: '#2DD4BF', fillOpacity: 1
+    }).addTo(map).bindPopup('You are here').openPopup();
+    map.setView([latitude, longitude], 13);
+
+    const nearest = withDist.slice(0, 5);
+    nearbyReadout.innerHTML = `
+      <div><strong>${within1mi.length}</strong> documented camera${within1mi.length === 1 ? '' : 's'} within 1 mile · <strong>${within3mi.length}</strong> within 3 miles</div>
+      ${nearest.length ? `<div class="nearby-list">${nearest.map(d => `
+        <div>${d.miles.toFixed(2)} mi — ${escapeHtml(d.entry.location)}</div>
+      `).join('')}</div>` : ''}
+    `;
+    nearbyReadout.classList.add('visible');
+    nearMeBtn.disabled = false;
+    nearMeBtn.textContent = '📍 Cameras near me';
+  }, (err) => {
+    nearbyReadout.innerHTML = 'Couldn\'t get your location — check your browser\'s location permission for this page.';
+    nearbyReadout.classList.add('visible');
+    nearMeBtn.disabled = false;
+    nearMeBtn.textContent = '📍 Cameras near me';
+  });
+});
 </script>
 </body>
 </html>
