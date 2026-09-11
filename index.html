@@ -1291,6 +1291,42 @@ function haversineMetersLocal(lat1, lng1, lat2, lng2){
   return 2 * R * Math.asin(Math.sqrt(a));
 }
 
+async function buildLocationSuggestion(lat, lng, entryCity){
+  const [streets, geoRes] = await Promise.all([
+    findNearestCrossStreets(lat, lng).catch(() => []),
+    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`).then(r => r.json()).catch(() => null)
+  ]);
+  const addr = (geoRes && geoRes.address) || {};
+  const city = entryCity || addr.city || addr.town || addr.village || '';
+  const isParking = (geoRes && geoRes.type === 'parking') ||
+                     (geoRes && geoRes.class === 'amenity' && geoRes.type === 'parking') ||
+                     /parking/i.test(addr.amenity || '');
+
+  let streetPart = '';
+  if(streets.length >= 2){
+    streetPart = `${streets[0]} & ${streets[1]}`;
+  }else if(streets.length === 1){
+    streetPart = streets[0];
+  }else if(addr.road){
+    streetPart = addr.house_number ? `${addr.house_number} ${addr.road}` : addr.road;
+  }else if(geoRes && geoRes.name){
+    // Named place (shopping center, lot, business) when no road is nearby
+    streetPart = geoRes.name;
+  }else if(geoRes && geoRes.display_name){
+    // Last resort: first couple segments of the full formatted address
+    streetPart = geoRes.display_name.split(',').slice(0, 2).join(',').trim();
+  }
+
+  if(!streetPart) return null;
+  if(isParking && !/parking/i.test(streetPart)) streetPart += ' (parking lot)';
+
+  return {
+    suggestion: city ? `${streetPart}, ${city}, CA` : streetPart,
+    city,
+    confident: streets.length >= 2
+  };
+}
+
 async function findNearestCrossStreets(lat, lng){
   const query = `[out:json][timeout:10];way["highway"]["name"](around:150,${lat},${lng});out tags geom;`;
   const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
@@ -1324,35 +1360,17 @@ async function lookupStreet(id, btn){
   btn.textContent = 'Looking up…';
   btn.disabled = true;
   try{
-    const [streets, geoRes] = await Promise.all([
-      findNearestCrossStreets(coords[0], coords[1]).catch(() => []),
-      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}&zoom=17&addressdetails=1`).then(r => r.json()).catch(() => null)
-    ]);
-    const addr = (geoRes && geoRes.address) || {};
-    const city = entry.city || addr.city || addr.town || addr.village || '';
-
-    let streetPart = '';
-    if(streets.length >= 2){
-      streetPart = `${streets[0]} & ${streets[1]}`;
-    }else if(streets.length === 1){
-      streetPart = streets[0];
-    }else if(addr.road){
-      streetPart = addr.road;
-    }
-
-    if(!streetPart){
-      alert('No nearby street names found — it may be off-road or the data is sparse here.');
+    const result = await buildLocationSuggestion(coords[0], coords[1], entry.city);
+    if(!result){
+      alert('Nothing findable at this location — no nearby streets, named places, or address data.');
       btn.textContent = originalText;
       btn.disabled = false;
       return;
     }
-
-    const suggestion = city ? `${streetPart}, ${city}, CA` : streetPart;
-
-    if(confirm(`Suggested location: "${suggestion}"\n\nOpen this entry to review and save it?`)){
+    if(confirm(`Suggested location: "${result.suggestion}"\n\nOpen this entry to review and save it?`)){
       openForm(entry);
-      document.getElementById('fLocation').value = suggestion;
-      if(city) document.getElementById('fCity').value = city;
+      document.getElementById('fLocation').value = result.suggestion;
+      if(result.city) document.getElementById('fCity').value = result.city;
     }
   }catch(err){
     alert('Lookup failed — try again in a moment.');
@@ -1743,24 +1761,17 @@ autofillStartBtn.addEventListener('click', async () => {
     const coords = getCoords(entry);
     autofillStatus.textContent = `Looking up ${done + 1} of ${targets.length}…`;
     try{
-      const [streets, geoRes] = await Promise.all([
-        findNearestCrossStreets(coords[0], coords[1]).catch(() => []),
-        fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}&zoom=17&addressdetails=1`).then(r => r.json()).catch(() => null)
-      ]);
-      const addr = (geoRes && geoRes.address) || {};
-      const city = entry.city || addr.city || addr.town || addr.village || '';
-
-      if(streets.length >= 2){
-        const suggestion = city ? `${streets[0]} & ${streets[1]}, ${city}, CA` : `${streets[0]} & ${streets[1]}`;
-        entry.location = suggestion;
-        if(city && !entry.city) entry.city = city;
+      const result = await buildLocationSuggestion(coords[0], coords[1], entry.city);
+      if(result){
+        entry.location = result.suggestion;
+        if(result.city && !entry.city) entry.city = result.city;
         entry.updatedAt = new Date().toISOString();
         await updateEntryRow(entry);
         updated++;
-        logAutofill(`✓ ${suggestion}`);
+        logAutofill(`${result.confident ? '✓' : '~'} ${result.suggestion}${result.confident ? '' : ' (low confidence — worth a manual check)'}`);
       }else{
         skipped++;
-        logAutofill(`— skipped (not enough nearby streets found)`);
+        logAutofill(`— skipped (nothing findable at this location)`);
       }
     }catch(err){
       skipped++;
