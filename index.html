@@ -1219,7 +1219,6 @@ function render(){
           <button class="link-btn" onclick="disputeEntry('${e.id}')">✗ Not there</button>
           <button class="link-btn" onclick="toggleStatus('${e.id}')">Mark ${e.status === 'active' ? 'filed' : 'active'}</button>
           <button class="link-btn" onclick="editEntry('${e.id}')">Edit</button>
-          <button class="link-btn danger" onclick="deleteEntry('${e.id}')">Delete</button>
         </div>
       </div>
     `;}).join('')}
