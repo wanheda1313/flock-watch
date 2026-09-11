@@ -1239,6 +1239,47 @@ function editEntry(id){
   if(entry) openForm(entry);
 }
 
+async function lookupStreet(id, btn){
+  const entry = entries.find(e => e.id === id);
+  if(!entry) return;
+  const coords = getCoords(entry);
+  if(!coords){
+    alert('This entry has no coordinates to look up.');
+    return;
+  }
+  const originalText = btn.textContent;
+  btn.textContent = 'Looking up…';
+  btn.disabled = true;
+  try{
+    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}&zoom=17&addressdetails=1`;
+    const res = await fetch(url);
+    const data = await res.json();
+    const addr = data.address || {};
+    const road = addr.road || '';
+    const houseNumber = addr.house_number || '';
+    const neighbourhood = addr.neighbourhood || addr.suburb || '';
+    let suggestion = '';
+    if(road){
+      suggestion = houseNumber ? `${houseNumber} ${road}` : road;
+      if(neighbourhood) suggestion += `, ${neighbourhood}`;
+    }
+    if(!suggestion){
+      alert('No street name found for this location — it may be off-road or the data is sparse here.');
+      btn.textContent = originalText;
+      btn.disabled = false;
+      return;
+    }
+    if(confirm(`Suggested location: "${suggestion}"\n\nOpen this entry to review and save it?`)){
+      openForm(entry);
+      document.getElementById('fLocation').value = suggestion;
+    }
+  }catch(err){
+    alert('Lookup failed — try again in a moment.');
+  }
+  btn.textContent = originalText;
+  btn.disabled = false;
+}
+
 async function confirmEntry(id){
   const idx = entries.findIndex(e => e.id === id);
   if(idx === -1) return;
@@ -1300,7 +1341,7 @@ function renderRecentTable(){
   }
   recentEl.innerHTML = recent.map(e => {
     const meta = statusMeta(e.status);
-    const when = e.updatedAt ? fmtRelative(e.updatedAt) : fmtDate(e.date);
+    const when = e.updatedAt ? (fmtRelative(e.updatedAt) || fmtDate(e.date)) : fmtDate(e.date);
     return `
       <div class="recent-row">
         <span class="recent-loc">${escapeHtml(e.location)}</span>
@@ -1388,6 +1429,7 @@ function render(){
             <option value="removed" ${e.status==='removed'?'selected':''}>Removed</option>
           </select>
           ${mapLink ? `<a class="link-btn" href="${mapLink}" target="_blank" rel="noopener">View on map ↗</a>` : ''}
+          <button class="link-btn" onclick="lookupStreet('${e.id}', this)">🔍 Look up street</button>
           <button class="link-btn" onclick="confirmEntry('${e.id}')">✓ Still there</button>
           <button class="link-btn" onclick="disputeEntry('${e.id}')">✗ Not there</button>
           <button class="link-btn" onclick="editEntry('${e.id}')">Edit</button>
