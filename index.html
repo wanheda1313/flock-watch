@@ -7,7 +7,9 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <style>
   :root{
@@ -130,9 +132,20 @@
   }
   .leaflet-popup-content{margin:12px 14px;font-size:0.9rem;}
   .leaflet-popup-tip{background:var(--card);}
+  .cluster-icon{
+    background: radial-gradient(circle at 32% 28%, #4FE8D6, var(--accent2) 60%, #0F4A44 100%);
+    border-radius:50%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    color:#0B1A18;
+    font-family:var(--font-display);
+    font-weight:800;
+    box-shadow:0 0 0 1px rgba(255,255,255,0.15), 0 0 14px rgba(45,212,191,0.55);
+  }
   .popup-status{font-family:var(--font-display);font-size:0.68rem;text-transform:uppercase;letter-spacing:0.04em;display:block;margin-bottom:4px;}
-  .popup-status.active{color:var(--accent-bright);}
-  .popup-status.removed{color:var(--slate);}
+  .popup-status.active{color:var(--accent2);}
+  .popup-status.removed{color:#F59E0B;}
   .popup-actions{margin-top:8px;display:flex;gap:10px;flex-wrap:wrap;}
   .popup-actions button{
     font-family:var(--font-body);font-size:0.8rem;font-weight:500;
@@ -607,7 +620,7 @@ const SEED_ENTRIES = [
   {
     id: 'seed-compton', location: 'Citywide deployment (exact intersections not yet mapped)', city: 'Compton', date: '2026-04-07', status: 'active',
     agency: 'Compton Police Department / Compton City Council', reporter: 'Compton Chamber of Commerce (news report)', photo: '',
-    notes: '74 ALPR cameras and 37 PTZ cameras approved citywide, unanimous City Council vote April 7, 2026. Individual intersections not yet documented by community mappers — no map pin until specific locations are confirmed.',
+    notes: '74 ALPR cameras and 37 PTZ cameras approved citywide, unanimous City Council vote April 7, 2026. A separate community count documents 68 readers already mapped in Compton by brand: 47 Flock Safety, 8 Axis Communications, 5 Neology, 2 Leonardo/ELSAG, 1 Motorola Solutions. Individual intersections not yet available in a form we could extract — no map pin until specific locations are confirmed.',
     updatedAt: new Date().toISOString()
   }
 ];
@@ -665,7 +678,18 @@ function initMap(){
     attribution: 'Esri, HERE, Garmin, &copy; OpenStreetMap contributors',
     maxZoom: 16
   }).addTo(map);
-  markerLayer = L.layerGroup().addTo(map);
+  markerLayer = L.markerClusterGroup({
+    maxClusterRadius: 50,
+    iconCreateFunction: function(cluster) {
+      const count = cluster.getChildCount();
+      const size = count < 10 ? 34 : count < 50 ? 42 : count < 200 ? 50 : 58;
+      return L.divIcon({
+        html: `<div class="cluster-icon" style="width:${size}px;height:${size}px;font-size:${size < 40 ? 12 : 14}px;">${count}</div>`,
+        className: '',
+        iconSize: [size, size]
+      });
+    }
+  }).addTo(map);
 }
 
 function renderMap(cutoffDate){
@@ -677,14 +701,14 @@ function renderMap(cutoffDate){
     const coords = getCoords(e);
     if(!coords) return;
     bounds.push(coords);
-    const color = e.status === 'active' ? '#3B82F6' : '#64748B';
+    const color = e.status === 'active' ? '#2DD4BF' : '#F59E0B';
     const marker = L.circleMarker(coords, {
-      radius: 8,
-      color: color,
+      radius: 7,
+      color: '#0B1A18',
+      weight: 1.5,
       fillColor: color,
-      fillOpacity: 0.8,
-      weight: 2
-    }).addTo(markerLayer);
+      fillOpacity: 0.9
+    });
     marker.bindPopup(`
       <span class="popup-status ${e.status}">${e.status === 'active' ? 'Active' : 'Filed'}</span>
       <strong>${escapeHtml(e.location)}</strong><br>
@@ -694,6 +718,7 @@ function renderMap(cutoffDate){
         <button onclick="editEntry('${e.id}')">Edit</button>
       </div>
     `);
+    markerLayer.addLayer(marker);
   });
   if(!cutoffDate && bounds.length > 0){
     map.fitBounds(bounds, { padding: [30,30], maxZoom: 15 });
