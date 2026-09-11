@@ -1239,6 +1239,36 @@ function editEntry(id){
   if(entry) openForm(entry);
 }
 
+function haversineMetersLocal(lat1, lng1, lat2, lng2){
+  const R = 6371000;
+  const toRad = d => d * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return 2 * R * Math.asin(Math.sqrt(a));
+}
+
+async function findNearestCrossStreets(lat, lng){
+  const query = `[out:json][timeout:10];way["highway"]["name"](around:150,${lat},${lng});out tags geom;`;
+  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+  const res = await fetch(url);
+  const data = await res.json();
+  const byName = {};
+  (data.elements || []).forEach(el => {
+    if(!el.tags || !el.tags.name || !el.geometry) return;
+    let minDist = Infinity;
+    el.geometry.forEach(pt => {
+      if(pt && pt.lat != null){
+        const d = haversineMetersLocal(lat, lng, pt.lat, pt.lon);
+        if(d < minDist) minDist = d;
+      }
+    });
+    const name = el.tags.name;
+    if(!byName[name] || minDist < byName[name]) byName[name] = minDist;
+  });
+  return Object.entries(byName).sort((a,b) => a[1] - b[1]).map(([name]) => name);
+}
+
 async function lookupStreet(id, btn){
   const entry = entries.find(e => e.id === id);
   if(!entry) return;
@@ -1251,27 +1281,35 @@ async function lookupStreet(id, btn){
   btn.textContent = 'Looking up…';
   btn.disabled = true;
   try{
-    const url = `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}&zoom=17&addressdetails=1`;
-    const res = await fetch(url);
-    const data = await res.json();
-    const addr = data.address || {};
-    const road = addr.road || '';
-    const houseNumber = addr.house_number || '';
-    const neighbourhood = addr.neighbourhood || addr.suburb || '';
-    let suggestion = '';
-    if(road){
-      suggestion = houseNumber ? `${houseNumber} ${road}` : road;
-      if(neighbourhood) suggestion += `, ${neighbourhood}`;
+    const [streets, geoRes] = await Promise.all([
+      findNearestCrossStreets(coords[0], coords[1]).catch(() => []),
+      fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords[0]}&lon=${coords[1]}&zoom=17&addressdetails=1`).then(r => r.json()).catch(() => null)
+    ]);
+    const addr = (geoRes && geoRes.address) || {};
+    const city = entry.city || addr.city || addr.town || addr.village || '';
+
+    let streetPart = '';
+    if(streets.length >= 2){
+      streetPart = `${streets[0]} & ${streets[1]}`;
+    }else if(streets.length === 1){
+      streetPart = streets[0];
+    }else if(addr.road){
+      streetPart = addr.road;
     }
-    if(!suggestion){
-      alert('No street name found for this location — it may be off-road or the data is sparse here.');
+
+    if(!streetPart){
+      alert('No nearby street names found — it may be off-road or the data is sparse here.');
       btn.textContent = originalText;
       btn.disabled = false;
       return;
     }
+
+    const suggestion = city ? `${streetPart}, ${city}, CA` : streetPart;
+
     if(confirm(`Suggested location: "${suggestion}"\n\nOpen this entry to review and save it?`)){
       openForm(entry);
       document.getElementById('fLocation').value = suggestion;
+      if(city) document.getElementById('fCity').value = city;
     }
   }catch(err){
     alert('Lookup failed — try again in a moment.');
