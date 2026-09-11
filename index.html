@@ -345,6 +345,52 @@
   }
   .route-cam-count.best{background:var(--accent2-soft);color:var(--accent2);}
   .route-cam-count.worse{background:rgba(245,158,11,0.14);color:#F59E0B;}
+
+  /* ---- Tabs ---- */
+  .tab-bar{
+    display:flex;
+    gap:6px;
+    margin-bottom:22px;
+    border-bottom:1px solid var(--border);
+  }
+  .tab-btn{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:0.9rem;
+    background:none;
+    border:none;
+    color:var(--text-soft);
+    padding:10px 4px;
+    margin-right:20px;
+    cursor:pointer;
+    border-bottom:2px solid transparent;
+  }
+  .tab-btn.active{color:#fff;border-bottom-color:var(--accent2);}
+  .tab-panel{display:none;}
+  .tab-panel.active{display:block;}
+
+  /* ---- Pagination ---- */
+  .pagination{
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    gap:14px;
+    margin-top:18px;
+  }
+  .pagination button{
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:0.85rem;
+    background:var(--card);
+    border:1px solid var(--border);
+    color:var(--text);
+    padding:8px 16px;
+    border-radius:8px;
+    cursor:pointer;
+  }
+  .pagination button:disabled{opacity:0.35;cursor:default;}
+  .pagination button:not(:disabled):hover{border-color:var(--accent2);}
+  .pagination-info{font-size:0.82rem;color:var(--text-soft);}
   .status-pill{
     display:inline-block;
     font-family:var(--font-display);
@@ -448,6 +494,13 @@
 
   <div class="notice">Shared record — anyone with this page can read and add entries. Leave out anything you wouldn't want public. Cross-street precision depends on whoever files the entry — coordinate-only entries link straight to Google Maps for the exact spot instead.</div>
 
+  <div class="tab-bar">
+    <button class="tab-btn active" id="tabBtnMap" onclick="switchTab('map')">Map & Routes</button>
+    <button class="tab-btn" id="tabBtnLog" onclick="switchTab('log')">Camera Log</button>
+  </div>
+
+  <div class="tab-panel active" id="tabMap">
+
   <div id="mapContainer"></div>
 
   <div class="timeline-bar">
@@ -466,6 +519,10 @@
     <div class="route-note">Shows a few real driving routes and how many documented cameras each one passes near — not a guaranteed camera-free path, since this only knows about cameras logged here.</div>
     <div id="routeResults"></div>
   </div>
+
+  </div>
+
+  <div class="tab-panel" id="tabLog">
 
   <div class="controls">
     <input type="text" id="searchInput" placeholder="Search by location or notes…">
@@ -544,13 +601,22 @@
   </div>
 
   <div class="list-grid">
-    <div id="listContainer">
-      <div class="empty-state"><p class="big">Loading…</p></div>
+    <div>
+      <div id="listContainer">
+        <div class="empty-state"><p class="big">Loading…</p></div>
+      </div>
+      <div class="pagination" id="paginationBar" style="display:none;">
+        <button id="prevPageBtn">← Prev</button>
+        <span class="pagination-info" id="pageInfo"></span>
+        <button id="nextPageBtn">Next →</button>
+      </div>
     </div>
     <div>
       <div class="section-title">Known operating agencies</div>
       <div class="agency-card" id="agencyContainer"><p class="agency-empty">Loading…</p></div>
     </div>
+  </div>
+
   </div>
 
 </div>
@@ -586,6 +652,19 @@ function fmtDate(iso){
   if(isNaN(d)) return iso;
   return d.toLocaleDateString(undefined, {year:'numeric', month:'short', day:'numeric'});
 }
+
+function switchTab(tab){
+  document.getElementById('tabMap').classList.toggle('active', tab === 'map');
+  document.getElementById('tabLog').classList.toggle('active', tab === 'log');
+  document.getElementById('tabBtnMap').classList.toggle('active', tab === 'map');
+  document.getElementById('tabBtnLog').classList.toggle('active', tab === 'log');
+  if(tab === 'map' && map){
+    setTimeout(() => map.invalidateSize(), 50);
+  }
+}
+
+const PAGE_SIZE = 20;
+let currentPage = 0;
 
 function escapeHtml(str){
   const div = document.createElement('div');
@@ -1010,11 +1089,14 @@ function render(){
   statCities.textContent = cityCount;
   renderAgencies();
 
+  const paginationBar = document.getElementById('paginationBar');
+
   if(entries.length === 0){
     listContainer.innerHTML = `<div class="empty-state">
       <p class="big">Nothing here yet</p>
       <p>Be the first to file a sighting.</p>
     </div>`;
+    paginationBar.style.display = 'none';
     return;
   }
   if(filtered.length === 0){
@@ -1022,11 +1104,22 @@ function render(){
       <p class="big">No matches</p>
       <p>Try a different search term or filter.</p>
     </div>`;
+    paginationBar.style.display = 'none';
     return;
   }
 
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  if(currentPage >= totalPages) currentPage = totalPages - 1;
+  if(currentPage < 0) currentPage = 0;
+  const pageItems = filtered.slice(currentPage * PAGE_SIZE, (currentPage + 1) * PAGE_SIZE);
+
+  paginationBar.style.display = totalPages > 1 ? 'flex' : 'none';
+  document.getElementById('pageInfo').textContent = `Page ${currentPage + 1} of ${totalPages} (${filtered.length} entries)`;
+  document.getElementById('prevPageBtn').disabled = currentPage === 0;
+  document.getElementById('nextPageBtn').disabled = currentPage >= totalPages - 1;
+
   listContainer.innerHTML = `<div class="entry-list">
-    ${filtered.map(e => {
+    ${pageItems.map(e => {
       const coords = getCoords(e);
       const mapLink = coords ? `https://www.google.com/maps/search/?api=1&query=${coords[0]},${coords[1]}` : null;
       return `
@@ -1054,9 +1147,12 @@ function render(){
   </div>`;
 }
 
-searchInput.addEventListener('input', render);
-statusFilter.addEventListener('change', render);
-cityFilter.addEventListener('change', render);
+document.getElementById('prevPageBtn').addEventListener('click', () => { currentPage--; render(); });
+document.getElementById('nextPageBtn').addEventListener('click', () => { currentPage++; render(); });
+
+searchInput.addEventListener('input', () => { currentPage = 0; render(); });
+statusFilter.addEventListener('change', () => { currentPage = 0; render(); });
+cityFilter.addEventListener('change', () => { currentPage = 0; render(); });
 
 /* ---- Route planner ---- */
 const routeFrom = document.getElementById('routeFrom');
