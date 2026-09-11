@@ -780,7 +780,8 @@ function fmtDate(iso){
 
 function fmtRelative(iso){
   if(!iso) return null;
-  const then = new Date(iso.includes('T') ? iso : iso + 'T00:00:00');
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + 'T00:00:00' : iso.replace(' ', 'T');
+  const then = new Date(normalized);
   if(isNaN(then)) return null;
   const diffMs = Date.now() - then.getTime();
   const diffMin = Math.round(diffMs / 60000);
@@ -794,6 +795,13 @@ function fmtRelative(iso){
   const diffMonth = Math.round(diffDay / 30);
   if(diffMonth < 12) return `${diffMonth} mo ago`;
   return `${Math.round(diffMonth / 12)} yr ago`;
+}
+
+function fmtDateCompact(iso){
+  if(!iso) return '—';
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(iso) ? iso + 'T00:00:00' : iso.replace(' ', 'T'));
+  if(isNaN(d)) return '—';
+  return `${d.getMonth()+1}/${d.getDate()}/${String(d.getFullYear()).slice(2)}`;
 }
 
 function switchTab(tab){
@@ -1312,11 +1320,12 @@ function render(){
   statCities.textContent = cityCount;
 
   const sortedByDate = entries.filter(e => e.date).sort((a,b) => b.date.localeCompare(a.date));
-  document.getElementById('statLastReported').textContent = sortedByDate.length ? fmtDate(sortedByDate[0].date) : '—';
+  document.getElementById('statLastReported').textContent = sortedByDate.length ? fmtDateCompact(sortedByDate[0].date) : '—';
 
   const sortedByUpdated = entries.filter(e => e.updatedAt).sort((a,b) => b.updatedAt.localeCompare(a.updatedAt));
   const lastReportedEl = document.getElementById('lastReported');
-  lastReportedEl.textContent = sortedByUpdated.length ? `Updated ${fmtRelative(sortedByUpdated[0].updatedAt)}` : '';
+  const relTime = sortedByUpdated.length ? fmtRelative(sortedByUpdated[0].updatedAt) : null;
+  lastReportedEl.textContent = relTime ? `Updated ${relTime}` : '';
 
   renderAgencies();
   renderRecentTable();
