@@ -1101,7 +1101,7 @@ function renderMap(cutoffDate){
   markerLayer.clearLayers();
   const bounds = [];
   const cameraNumbers = computeCameraNumbers();
-  entries.forEach(e => {
+  getFiltered().forEach(e => {
     if(cutoffDate && e.date && e.date > cutoffDate) return;
     const coords = getCoords(e);
     if(!coords) return;
@@ -1607,10 +1607,10 @@ function render(){
 document.getElementById('prevPageBtn').addEventListener('click', () => { currentPage--; render(); });
 document.getElementById('nextPageBtn').addEventListener('click', () => { currentPage++; render(); });
 
-searchInput.addEventListener('input', () => { currentPage = 0; render(); });
-statusFilter.addEventListener('change', () => { currentPage = 0; render(); });
-typeFilter.addEventListener('change', () => { currentPage = 0; render(); });
-cityFilter.addEventListener('change', () => { currentPage = 0; render(); });
+searchInput.addEventListener('input', () => { currentPage = 0; render(); renderMap(null); });
+statusFilter.addEventListener('change', () => { currentPage = 0; render(); renderMap(null); });
+typeFilter.addEventListener('change', () => { currentPage = 0; render(); renderMap(null); });
+cityFilter.addEventListener('change', () => { currentPage = 0; render(); renderMap(null); });
 
 /* ---- Route planner ---- */
 const routeFrom = document.getElementById('routeFrom');
