@@ -608,6 +608,7 @@
 
   <div class="tab-bar">
     <button class="tab-btn active" id="tabBtnMap" onclick="switchTab('map')">Map & Routes</button>
+    <button class="tab-btn" id="tabBtnSpeed" onclick="switchTab('speed')" style="color:#F59E0B;">🚧 Speed Cameras</button>
     <button class="tab-btn" id="tabBtnLog" onclick="switchTab('log')">Camera Log</button>
   </div>
 
@@ -639,6 +640,14 @@
         <div class="autocomplete-list" id="routeToList"></div>
       </div>
       <button class="btn" id="findRouteBtn">Find routes</button>
+    </div>
+    <div class="route-inputs" style="margin-top:-4px;">
+      <label for="routeAvoidType" style="color:var(--text-soft);font-size:13px;">Avoid:</label>
+      <select id="routeAvoidType" style="flex:0 0 auto;">
+        <option value="all">All cameras</option>
+        <option value="flock">Flock / ALPR only</option>
+        <option value="speed_camera">Speed cameras only</option>
+      </select>
     </div>
     <div class="route-note">Shows a few real driving routes and how many documented cameras each one passes near — not a guaranteed camera-free path, since this only knows about cameras logged here.</div>
     <div id="routeResults"></div>
@@ -872,12 +881,19 @@ function fmtDateCompact(iso){
 }
 
 function switchTab(tab){
-  document.getElementById('tabMap').classList.toggle('active', tab === 'map');
+  document.getElementById('tabMap').classList.toggle('active', tab === 'map' || tab === 'speed');
   document.getElementById('tabLog').classList.toggle('active', tab === 'log');
   document.getElementById('tabBtnMap').classList.toggle('active', tab === 'map');
+  document.getElementById('tabBtnSpeed').classList.toggle('active', tab === 'speed');
   document.getElementById('tabBtnLog').classList.toggle('active', tab === 'log');
-  if(tab === 'map' && map){
+  if(tab === 'speed'){
+    typeFilter.value = 'speed_camera';
+    currentPage = 0;
+    render();
+  }
+  if((tab === 'map' || tab === 'speed') && map){
     setTimeout(() => map.invalidateSize(), 50);
+    renderMap(null);
   }
 }
 
@@ -1093,11 +1109,14 @@ function renderMap(cutoffDate){
     const color = statusMeta(e.status).color;
     let marker;
     if(e.cameraType === 'speed_camera'){
-      // Square marker distinguishes speed cameras from round Flock/ALPR markers
+      // Fixed amber square, independent of status color, so speed cameras read as a
+      // distinct category on the map at a glance. Status is conveyed via opacity instead.
+      const opacityByStatus = { active: 1, unknown: 0.85, relocated: 0.7, removed: 0.35 };
+      const op = opacityByStatus[e.status] != null ? opacityByStatus[e.status] : 1;
       marker = L.marker(coords, {
         icon: L.divIcon({
           className: '',
-          html: `<div style="width:14px;height:14px;border-radius:3px;background:${color};border:1.5px solid #0B1A18;box-shadow:0 0 0 1px rgba(255,255,255,0.15);"></div>`,
+          html: `<div style="width:14px;height:14px;border-radius:3px;background:#F59E0B;opacity:${op};border:1.5px solid #0B1A18;box-shadow:0 0 0 1px rgba(255,255,255,0.15);"></div>`,
           iconSize: [14,14],
           iconAnchor: [7,7]
         })
@@ -1598,6 +1617,7 @@ const routeFrom = document.getElementById('routeFrom');
 const routeTo = document.getElementById('routeTo');
 const findRouteBtn = document.getElementById('findRouteBtn');
 const routeResults = document.getElementById('routeResults');
+const routeAvoidType = document.getElementById('routeAvoidType');
 let routeLayer = null;
 let routeOptionsData = [];
 
@@ -1662,8 +1682,11 @@ function setupAutocomplete(inputId, listId){
 setupAutocomplete('routeFrom', 'routeFromList');
 setupAutocomplete('routeTo', 'routeToList');
 
-function countCamerasNearRoute(coords){
-  const activeCams = entries.filter(e => e.status === 'active').map(getCoords).filter(Boolean);
+function countCamerasNearRoute(coords, avoidType){
+  const activeCams = entries
+    .filter(e => e.status === 'active')
+    .filter(e => !avoidType || avoidType === 'all' || (e.cameraType || 'flock') === avoidType)
+    .map(getCoords).filter(Boolean);
   let count = 0;
   const step = Math.max(1, Math.floor(coords.length / 200));
   for(let i = 0; i < coords.length; i += step){
@@ -1742,7 +1765,7 @@ findRouteBtn.addEventListener('click', async () => {
       coords: r.geometry.coordinates,
       minutes: Math.round(r.duration / 60),
       miles: (r.distance / 1609.34).toFixed(1),
-      camCount: countCamerasNearRoute(r.geometry.coordinates)
+      camCount: countCamerasNearRoute(r.geometry.coordinates, routeAvoidType.value)
     }));
     let bestIdx = 0;
     routeOptionsData.forEach((r,i) => { if(r.camCount < routeOptionsData[bestIdx].camCount) bestIdx = i; });
