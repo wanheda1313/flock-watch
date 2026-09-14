@@ -1914,6 +1914,29 @@ loadSpeedCameras();
 /* ---- Speed safety cameras (AB 645) — separate table, separate program from ALPR ---- */
 let speedCamerasLoaded = false;
 let speedCameraData = [];
+let speedCameraLayer = null;
+
+function renderSpeedCameraMarkers(){
+  if(!map) return;
+  if(!speedCameraLayer) speedCameraLayer = L.layerGroup().addTo(map);
+  speedCameraLayer.clearLayers();
+  speedCameraData.forEach(row => {
+    if(row.lat == null || row.lng == null) return;
+    const icon = L.divIcon({
+      html: '<div style="width:14px;height:14px;background:#EF4444;border:2px solid #0B1A18;transform:rotate(45deg);box-shadow:0 0 6px rgba(239,68,68,0.7);"></div>',
+      className: '',
+      iconSize: [14,14]
+    });
+    const marker = L.marker([row.lat, row.lng], { icon });
+    marker.bindPopup(`
+      <span class="popup-status" style="color:#EF4444;">Speed Safety Camera</span>
+      <strong>${escapeHtml(row.street)}</strong><br>
+      ${escapeHtml(row.cross_streets)}${row.city ? `, ${escapeHtml(row.city)}, CA` : ''}
+      ${row.posted_mph ? `<div style="margin-top:6px;font-size:0.8rem;color:var(--text-soft);">${row.posted_mph} mph posted · cited at ${row.citation_mph}+</div>` : ''}
+    `, { maxWidth: 260 });
+    speedCameraLayer.addLayer(marker);
+  });
+}
 
 async function loadSpeedCameras(){
   const container = document.getElementById('speedCameraList');
@@ -1928,10 +1951,16 @@ async function loadSpeedCameras(){
     return;
   }
   speedCameraData = data;
+  renderSpeedCameraMarkers();
+  renderSpeedCameraList(data);
 
   const needsGeocode = data.filter(r => r.lat == null || r.lng == null);
   if(needsGeocode.length > 0){
-    container.innerHTML += `<p class="agency-empty" id="geocodeStatus">Locating ${needsGeocode.length} camera${needsGeocode.length===1?'':'s'} on the map (one-time)…</p>`;
+    const statusBar = document.createElement('p');
+    statusBar.className = 'agency-empty';
+    statusBar.id = 'geocodeStatus';
+    statusBar.textContent = `Locating ${needsGeocode.length} camera${needsGeocode.length===1?'':'s'} on the map (one-time, running in background)…`;
+    container.prepend(statusBar);
     for(const row of needsGeocode){
       try{
         const q = `${row.street} at ${row.cross_streets.split(/[–\-]/)[0].trim()}, ${row.city}, CA`;
@@ -1942,6 +1971,7 @@ async function loadSpeedCameras(){
           row.lat = Number(results[0].lat);
           row.lng = Number(results[0].lon);
           await db.from('speed_cameras').update({ lat: row.lat, lng: row.lng }).eq('id', row.id);
+          renderSpeedCameraMarkers();
         }
       }catch(err){ /* skip, leave uncoded */ }
       await new Promise(r => setTimeout(r, 1200));
@@ -1949,8 +1979,6 @@ async function loadSpeedCameras(){
     const statusEl = document.getElementById('geocodeStatus');
     if(statusEl) statusEl.remove();
   }
-
-  renderSpeedCameraList(data);
 }
 
 function renderSpeedCameraList(data){
