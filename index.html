@@ -426,6 +426,61 @@
   }
   .about-section h2{font-family:var(--font-display);font-size:1rem;color:#fff;margin:0 0 10px;}
 
+  .speed-notice{
+    background:rgba(245,158,11,0.1);
+    border:1px solid rgba(245,158,11,0.3);
+    border-radius:12px;
+    padding:16px 18px;
+    margin-bottom:22px;
+    font-size:0.88rem;
+    color:var(--text);
+    line-height:1.55;
+  }
+  .speed-notice strong{color:#F59E0B;}
+  .speed-district{
+    font-family:var(--font-display);
+    font-size:0.8rem;
+    color:var(--text-soft);
+    margin:22px 0 10px;
+    text-transform:uppercase;
+    letter-spacing:0.04em;
+  }
+  .speed-district:first-of-type{margin-top:0;}
+  .speed-row{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:12px;
+    padding:14px 18px;
+    margin-bottom:10px;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+  }
+  .speed-row .speed-street{font-family:var(--font-display);font-weight:700;color:#fff;font-size:0.95rem;}
+  .speed-row .speed-cross{font-size:0.84rem;color:var(--text-soft);margin-top:2px;}
+  .speed-row .speed-limits{
+    font-family:var(--font-display);
+    font-size:0.8rem;
+    color:#F59E0B;
+    background:rgba(245,158,11,0.12);
+    padding:5px 12px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .speed-preview{
+    background:rgba(245,158,11,0.08);
+    border:1px solid rgba(245,158,11,0.25);
+    border-radius:14px;
+    padding:18px 20px;
+    margin-bottom:22px;
+  }
+  .speed-preview-top{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;}
+  .speed-preview .section-title{margin-bottom:4px;color:#F59E0B;}
+  .speed-preview p{font-size:0.86rem;color:var(--text-soft);margin:4px 0 0;}
+  .speed-preview .btn.secondary{border-color:rgba(245,158,11,0.4);color:#F59E0B;}
+
   .autofill-card{
     background:var(--card);
     border:1px solid var(--border);
@@ -609,6 +664,8 @@
   <div class="tab-bar">
     <button class="tab-btn active" id="tabBtnMap" onclick="switchTab('map')">Map & Routes</button>
     <button class="tab-btn" id="tabBtnLog" onclick="switchTab('log')">Camera Log</button>
+    <button class="tab-btn" id="tabBtnReport" onclick="switchTab('report')">Report a Camera</button>
+    <button class="tab-btn" id="tabBtnSpeed" onclick="switchTab('speed')">Speed Cameras</button>
   </div>
 
   <div class="tab-panel active" id="tabMap">
@@ -644,6 +701,16 @@
     <div id="routeResults"></div>
   </div>
 
+  <div class="speed-preview">
+    <div class="speed-preview-top">
+      <div>
+        <div class="section-title">🚦 Speed Safety Cameras (AB 645)</div>
+        <p>18 official speed enforcement cameras in Long Beach — a separate program from the Flock/ALPR cameras above.</p>
+      </div>
+      <button class="btn secondary" onclick="switchTab('speed')">View all →</button>
+    </div>
+  </div>
+
   <div class="section-title">Recently reported</div>
   <div class="recent-table" id="recentTable"></div>
 
@@ -677,10 +744,31 @@
       <option value="relocated">Relocated only</option>
       <option value="removed">Removed only</option>
     </select>
-    <button class="btn" id="toggleFormBtn">+ File a sighting</button>
+    <button class="btn" onclick="switchTab('report'); openForm(null);">+ File a sighting</button>
   </div>
 
-  <div class="form-panel" id="formPanel">
+  <div class="list-grid">
+    <div>
+      <div id="listContainer">
+        <div class="empty-state"><p class="big">Loading…</p></div>
+      </div>
+      <div class="pagination" id="paginationBar" style="display:none;">
+        <button id="prevPageBtn">← Prev</button>
+        <span class="pagination-info" id="pageInfo"></span>
+        <button id="nextPageBtn">Next →</button>
+      </div>
+    </div>
+    <div>
+      <div class="section-title">Known operating agencies</div>
+      <div class="agency-card" id="agencyContainer"><p class="agency-empty">Loading…</p></div>
+    </div>
+  </div>
+
+  </div>
+
+  <div class="tab-panel" id="tabReport">
+
+  <div class="form-panel open" id="formPanel">
     <h2>New entry</h2>
     <div class="field-row">
       <div class="field">
@@ -745,22 +833,15 @@
     </div>
   </div>
 
-  <div class="list-grid">
-    <div>
-      <div id="listContainer">
-        <div class="empty-state"><p class="big">Loading…</p></div>
-      </div>
-      <div class="pagination" id="paginationBar" style="display:none;">
-        <button id="prevPageBtn">← Prev</button>
-        <span class="pagination-info" id="pageInfo"></span>
-        <button id="nextPageBtn">Next →</button>
-      </div>
-    </div>
-    <div>
-      <div class="section-title">Known operating agencies</div>
-      <div class="agency-card" id="agencyContainer"><p class="agency-empty">Loading…</p></div>
-    </div>
   </div>
+
+  <div class="tab-panel" id="tabSpeed">
+
+  <div class="speed-notice">
+    <strong>This is a different program from everything else on this site.</strong> These are automated speed enforcement cameras under California's AB 645 pilot — they photograph vehicles exceeding the posted limit by 11+ mph and issue citations. They do <strong>not</strong> read every plate into a searchable tracking database like Flock/ALPR cameras do, and in Long Beach they're run by the Public Works department, not police — citation data isn't shared with LBPD. Currently Long Beach-only; the same state program also covers Los Angeles, San Francisco, Oakland, San José, Glendale, and Malibu, which aren't included here yet.
+  </div>
+
+  <div id="speedCameraList"><p class="agency-empty">Loading…</p></div>
 
   </div>
 
@@ -785,7 +866,6 @@ const statTotal = document.getElementById('statTotal');
 const statActive = document.getElementById('statActive');
 const statCities = document.getElementById('statCities');
 const formPanel = document.getElementById('formPanel');
-const toggleFormBtn = document.getElementById('toggleFormBtn');
 const cancelFormBtn = document.getElementById('cancelFormBtn');
 const saveEntryBtn = document.getElementById('saveEntryBtn');
 const searchInput = document.getElementById('searchInput');
@@ -850,10 +930,17 @@ function fmtDateCompact(iso){
 function switchTab(tab){
   document.getElementById('tabMap').classList.toggle('active', tab === 'map');
   document.getElementById('tabLog').classList.toggle('active', tab === 'log');
+  document.getElementById('tabReport').classList.toggle('active', tab === 'report');
+  document.getElementById('tabSpeed').classList.toggle('active', tab === 'speed');
   document.getElementById('tabBtnMap').classList.toggle('active', tab === 'map');
   document.getElementById('tabBtnLog').classList.toggle('active', tab === 'log');
+  document.getElementById('tabBtnReport').classList.toggle('active', tab === 'report');
+  document.getElementById('tabBtnSpeed').classList.toggle('active', tab === 'speed');
   if(tab === 'map' && map){
     setTimeout(() => map.invalidateSize(), 50);
+  }
+  if(tab === 'speed' && !speedCamerasLoaded){
+    loadSpeedCameras();
   }
 }
 
@@ -1078,32 +1165,53 @@ function renderMap(cutoffDate){
 }
 
 /* ---- Timeline (growth-over-time) ---- */
-let timelineDates = [];
+let timelineMonths = [];
 let playTimer = null;
 
 function setupTimeline(){
   const dated = entries.filter(e => e.date).map(e => e.date).sort();
-  timelineDates = [...new Set(dated)];
-  if(timelineDates.length < 2){
+  if(dated.length < 2){
     document.querySelector('.timeline-bar').style.display = 'none';
     return;
   }
+  const firstMonth = dated[0].slice(0,7);
+  const lastMonth = dated[dated.length-1].slice(0,7);
+  timelineMonths = [];
+  let [y,m] = firstMonth.split('-').map(Number);
+  const [ly,lm] = lastMonth.split('-').map(Number);
+  while(y < ly || (y === ly && m <= lm)){
+    const monthKey = `${y}-${String(m).padStart(2,'0')}`;
+    const monthEnd = `${monthKey}-31`;
+    const count = entries.filter(e => e.date && e.date <= monthEnd).length;
+    timelineMonths.push({ key: monthKey, count });
+    m++;
+    if(m > 12){ m = 1; y++; }
+  }
   document.querySelector('.timeline-bar').style.display = 'flex';
-  timelineSlider.max = timelineDates.length - 1;
-  timelineSlider.value = timelineDates.length - 1;
-  timelineDate.textContent = 'All time';
+  timelineSlider.max = timelineMonths.length - 1;
+  timelineSlider.value = timelineMonths.length - 1;
+  updateTimelineDisplay(timelineMonths.length - 1);
+}
+
+function monthLabel(key){
+  const [y,m] = key.split('-').map(Number);
+  const names = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  return `${names[m-1]} ${y}`;
+}
+
+function updateTimelineDisplay(idx){
+  const bucket = timelineMonths[idx];
+  const isLatest = idx >= timelineMonths.length - 1;
+  timelineDate.innerHTML = `<strong style="font-size:1.1rem;">${bucket.count}</strong> cameras as of <strong>${monthLabel(bucket.key)}</strong>${isLatest ? ' (latest)' : ''}`;
+  if(isLatest){
+    renderMap(null);
+  }else{
+    renderMap(`${bucket.key}-31`);
+  }
 }
 
 timelineSlider.addEventListener('input', () => {
-  const idx = Number(timelineSlider.value);
-  if(idx >= timelineDates.length - 1){
-    timelineDate.textContent = 'All time';
-    renderMap(null);
-  }else{
-    const cutoff = timelineDates[idx];
-    timelineDate.textContent = fmtDate(cutoff);
-    renderMap(cutoff);
-  }
+  updateTimelineDisplay(Number(timelineSlider.value));
 });
 
 playBtn.addEventListener('click', () => {
@@ -1118,7 +1226,7 @@ playBtn.addEventListener('click', () => {
   timelineSlider.dispatchEvent(new Event('input'));
   playTimer = setInterval(() => {
     let v = Number(timelineSlider.value);
-    if(v >= timelineDates.length - 1){
+    if(v >= timelineMonths.length - 1){
       clearInterval(playTimer);
       playTimer = null;
       playBtn.textContent = '▶ Play growth';
@@ -1126,7 +1234,7 @@ playBtn.addEventListener('click', () => {
     }
     timelineSlider.value = v + 1;
     timelineSlider.dispatchEvent(new Event('input'));
-  }, 700);
+  }, 900);
 });
 
 async function loadEntries(){
@@ -1184,24 +1292,14 @@ function openForm(entry){
   document.getElementById('fLat').value = entry && entry.lat != null ? entry.lat : '';
   document.getElementById('fLng').value = entry && entry.lng != null ? entry.lng : '';
   document.querySelector('#formPanel h2').textContent = entry ? 'Edit entry' : 'New entry';
-  formPanel.classList.add('open');
-  toggleFormBtn.textContent = 'Close form';
   document.getElementById('fLocation').focus();
 }
 
 function closeForm(){
   editingId = null;
-  formPanel.classList.remove('open');
-  toggleFormBtn.textContent = '+ File a sighting';
+  switchTab('log');
 }
 
-toggleFormBtn.addEventListener('click', () => {
-  if(formPanel.classList.contains('open')){
-    closeForm();
-  }else{
-    openForm(null);
-  }
-});
 cancelFormBtn.addEventListener('click', closeForm);
 
 saveEntryBtn.addEventListener('click', async () => {
@@ -1279,7 +1377,10 @@ async function deleteEntry(id){
 
 function editEntry(id){
   const entry = entries.find(e => e.id === id);
-  if(entry) openForm(entry);
+  if(entry){
+    switchTab('report');
+    openForm(entry);
+  }
 }
 
 function haversineMetersLocal(lat1, lng1, lat2, lng2){
@@ -1368,6 +1469,7 @@ async function lookupStreet(id, btn){
       return;
     }
     if(confirm(`Suggested location: "${result.suggestion}"\n\nOpen this entry to review and save it?`)){
+      switchTab('report');
       openForm(entry);
       document.getElementById('fLocation').value = result.suggestion;
       if(result.city) document.getElementById('fCity').value = result.city;
@@ -1720,6 +1822,42 @@ findRouteBtn.addEventListener('click', async () => {
 
 initMap();
 loadEntries();
+
+/* ---- Speed safety cameras (AB 645) — separate table, separate program from ALPR ---- */
+let speedCamerasLoaded = false;
+
+async function loadSpeedCameras(){
+  const container = document.getElementById('speedCameraList');
+  const { data, error } = await db.from('speed_cameras').select('*');
+  if(error){
+    container.innerHTML = `<p class="agency-empty">Couldn't load speed camera data — ${escapeHtml(error.message)}</p>`;
+    return;
+  }
+  speedCamerasLoaded = true;
+  if(!data || data.length === 0){
+    container.innerHTML = '<p class="agency-empty">No speed camera data yet.</p>';
+    return;
+  }
+  const byDistrict = {};
+  data.forEach(row => {
+    const d = row.council_district || 'Unlisted';
+    if(!byDistrict[d]) byDistrict[d] = [];
+    byDistrict[d].push(row);
+  });
+  const districts = Object.keys(byDistrict).sort();
+  container.innerHTML = districts.map(d => `
+    <div class="speed-district">${escapeHtml(d)} — ${byDistrict[d].length} camera${byDistrict[d].length === 1 ? '' : 's'}</div>
+    ${byDistrict[d].map(row => `
+      <div class="speed-row">
+        <div>
+          <div class="speed-street">${escapeHtml(row.street)}</div>
+          <div class="speed-cross">${escapeHtml(row.cross_streets)}${row.city ? `, ${escapeHtml(row.city)}, CA` : ''}</div>
+        </div>
+        <span class="speed-limits">${row.posted_mph} mph posted · cited at ${row.citation_mph}+</span>
+      </div>
+    `).join('')}
+  `).join('');
+}
 
 /* ---- Batch auto-fill cross streets (owner-run, rate-limited to respect free geocoder policy) ---- */
 const autofillStartBtn = document.getElementById('autofillStartBtn');
