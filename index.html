@@ -1912,7 +1912,13 @@ function renderSpeedMarkersOnto(layer){
 function refreshAllSpeedLayers(){
   if(speedCameraLayer) renderSpeedMarkersOnto(speedCameraLayer);
   if(speedLayerAll) renderSpeedMarkersOnto(speedLayerAll);
-  if(speedLayerOnly) renderSpeedMarkersOnto(speedLayerOnly);
+  if(speedLayerOnly){
+    renderSpeedMarkersOnto(speedLayerOnly);
+    if(mapSpeedOnly){
+      const coords = speedCameraData.filter(r => r.lat != null && r.lng != null).map(r => [r.lat, r.lng]);
+      if(coords.length > 0) mapSpeedOnly.fitBounds(coords, { padding: [30,30], maxZoom: 13 });
+    }
+  }
 }
 
 async function loadSpeedCameras(){
