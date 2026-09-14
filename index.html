@@ -1947,7 +1947,7 @@ async function loadSpeedCameras(){
     for(const row of needsGeocode){
       try{
         const q = `${row.street}, ${row.city}, CA`;
-        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(q)}`;
+        const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&viewbox=-119.0,34.3,-117.5,33.5&bounded=1&q=${encodeURIComponent(q)}`;
         const res = await fetch(url);
         const results = await res.json();
         if(results && results[0]){
