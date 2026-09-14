@@ -761,6 +761,11 @@
     </div>
   </div>
 
+  <div class="about-section">
+    <h2>About This Map</h2>
+    <p>Flock Watch is a community-maintained record of publicly observed license-plate cameras. Information is submitted by users and may change over time. Camera locations, statuses, and operating agencies should be independently verified before being relied upon. "Community Confirmed" and similar labels reflect confirm/dispute activity from people using this page — they are not official verification by any agency.</p>
+  </div>
+
   </div>
 
   <div class="tab-panel" id="tabReport">
@@ -840,11 +845,6 @@
 
   <div id="speedCameraList"><p class="agency-empty">Loading…</p></div>
 
-  </div>
-
-  <div class="about-section">
-    <h2>About This Map</h2>
-    <p>Flock Watch is a community-maintained record of publicly observed license-plate cameras. Information is submitted by users and may change over time. Camera locations, statuses, and operating agencies should be independently verified before being relied upon. "Community Confirmed" and similar labels reflect confirm/dispute activity from people using this page — they are not official verification by any agency.</p>
   </div>
 
 </div>
@@ -1205,14 +1205,12 @@ function renderAlprMarkersOnto(targetMap, clusterLayer, cutoffDate){
 function renderMap(cutoffDate){
   if(!map) return;
   renderAlprMarkersOnto(map, markerLayer, cutoffDate);
-  if(speedCameraLayer) speedCameraLayer.bringToFront();
 }
 
 function renderMapAll(){
   if(!mapAll) return;
   renderAlprMarkersOnto(mapAll, markerLayerAll, null);
   if(speedLayerAll) renderSpeedMarkersOnto(speedLayerAll);
-  if(speedLayerAll) speedLayerAll.bringToFront();
 }
 
 function renderMapSpeedOnly(){
@@ -1909,7 +1907,6 @@ function renderSpeedMarkersOnto(layer){
     `, { maxWidth: 260 });
     layer.addLayer(marker);
   });
-  layer.bringToFront();
 }
 
 function refreshAllSpeedLayers(){
