@@ -662,13 +662,13 @@
   <div class="notice">Shared record — anyone with this page can read and add entries. Leave out anything you wouldn't want public. Cross-street precision depends on whoever files the entry — coordinate-only entries link straight to Google Maps for the exact spot instead.</div>
 
   <div class="tab-bar">
-    <button class="tab-btn active" id="tabBtnMap" onclick="switchTab('map')">Map & Routes</button>
-    <button class="tab-btn" id="tabBtnLog" onclick="switchTab('log')">Camera Log</button>
-    <button class="tab-btn" id="tabBtnReport" onclick="switchTab('report')">Report a Camera</button>
+    <button class="tab-btn active" id="tabBtnLog" onclick="switchTab('log')">Camera Log</button>
     <button class="tab-btn" id="tabBtnSpeed" onclick="switchTab('speed')">Speed Cameras</button>
+    <button class="tab-btn" id="tabBtnReport" onclick="switchTab('report')">Report a Camera</button>
+    <button class="tab-btn" id="tabBtnMap" onclick="switchTab('map')">Map & Routes</button>
   </div>
 
-  <div class="tab-panel active" id="tabMap">
+  <div class="tab-panel" id="tabMap">
 
   <div class="map-toolbar">
     <button class="btn secondary" id="nearMeBtn">📍 Cameras near me</button>
@@ -711,22 +711,12 @@
     <div id="routeResults"></div>
   </div>
 
-  <div class="speed-preview">
-    <div class="speed-preview-top">
-      <div>
-        <div class="section-title">🚦 Speed Safety Cameras (AB 645)</div>
-        <p>18 official speed enforcement cameras in Long Beach — a separate program from the Flock/ALPR cameras above.</p>
-      </div>
-      <button class="btn secondary" onclick="switchTab('speed')">View all →</button>
-    </div>
-  </div>
-
   <div class="section-title">Recently reported</div>
   <div class="recent-table" id="recentTable"></div>
 
   </div>
 
-  <div class="tab-panel" id="tabLog">
+  <div class="tab-panel active" id="tabLog">
 
   <div class="autofill-card">
     <div class="section-title" style="margin-bottom:6px;">Auto-fill cross streets</div>
@@ -847,9 +837,7 @@
 
   <div class="tab-panel" id="tabSpeed">
 
-  <div class="speed-notice">
-    <strong>This is a different program from everything else on this site.</strong> These are automated speed enforcement cameras under California's AB 645 pilot — they photograph vehicles exceeding the posted limit by 11+ mph and issue citations. They do <strong>not</strong> read every plate into a searchable tracking database like Flock/ALPR cameras do, and in Long Beach they're run by the Public Works department, not police — citation data isn't shared with LBPD. Currently Long Beach-only; the same state program also covers Los Angeles, San Francisco, Oakland, San José, Glendale, and Malibu, which aren't included here yet.
-  </div>
+  <div class="tab-bar" id="speedCityTabs" style="margin-bottom:18px;"></div>
 
   <div id="speedCameraList"><p class="agency-empty">Loading…</p></div>
 
@@ -1172,6 +1160,7 @@ function renderMap(cutoffDate){
   if(!cutoffDate && bounds.length > 0){
     map.fitBounds(bounds, { padding: [30,30], maxZoom: 15 });
   }
+  if(speedCameraLayer) speedCameraLayer.bringToFront();
 }
 
 /* ---- Timeline (growth-over-time) ---- */
@@ -1923,11 +1912,11 @@ function renderSpeedCameraMarkers(){
   speedCameraData.forEach(row => {
     if(row.lat == null || row.lng == null) return;
     const icon = L.divIcon({
-      html: '<div style="width:14px;height:14px;background:#EF4444;border:2px solid #0B1A18;transform:rotate(45deg);box-shadow:0 0 6px rgba(239,68,68,0.7);"></div>',
+      html: '<div style="width:20px;height:20px;background:#EF4444;border:2.5px solid #fff;transform:rotate(45deg);box-shadow:0 0 10px 3px rgba(239,68,68,0.85);"></div>',
       className: '',
-      iconSize: [14,14]
+      iconSize: [20,20]
     });
-    const marker = L.marker([row.lat, row.lng], { icon });
+    const marker = L.marker([row.lat, row.lng], { icon, zIndexOffset: 1000 });
     marker.bindPopup(`
       <span class="popup-status" style="color:#EF4444;">Speed Safety Camera</span>
       <strong>${escapeHtml(row.street)}</strong><br>
@@ -1936,6 +1925,7 @@ function renderSpeedCameraMarkers(){
     `, { maxWidth: 260 });
     speedCameraLayer.addLayer(marker);
   });
+  speedCameraLayer.bringToFront();
 }
 
 async function loadSpeedCameras(){
@@ -1981,11 +1971,23 @@ async function loadSpeedCameras(){
   }
 }
 
+let selectedSpeedCity = null;
+
 function renderSpeedCameraList(data){
+  const cityTabsEl = document.getElementById('speedCityTabs');
+  const cities = [...new Set(data.map(r => r.city).filter(Boolean))].sort();
+  if(!selectedSpeedCity || !cities.includes(selectedSpeedCity)){
+    selectedSpeedCity = cities[0];
+  }
+  cityTabsEl.innerHTML = cities.map(c => `
+    <button class="tab-btn ${c === selectedSpeedCity ? 'active' : ''}" onclick="selectSpeedCity('${escapeHtml(c)}')">${escapeHtml(c)} (${data.filter(r => r.city === c).length})</button>
+  `).join('');
+
   const container = document.getElementById('speedCameraList');
+  const filtered = data.filter(r => r.city === selectedSpeedCity);
   const byDistrict = {};
-  data.forEach(row => {
-    const d = row.council_district || 'Unlisted';
+  filtered.forEach(row => {
+    const d = row.council_district && row.council_district !== 'N/A' ? row.council_district : 'All locations';
     if(!byDistrict[d]) byDistrict[d] = [];
     byDistrict[d].push(row);
   });
@@ -1998,10 +2000,15 @@ function renderSpeedCameraList(data){
           <div class="speed-street">${escapeHtml(row.street)}</div>
           <div class="speed-cross">${escapeHtml(row.cross_streets)}${row.city ? `, ${escapeHtml(row.city)}, CA` : ''}</div>
         </div>
-        <span class="speed-limits">${row.posted_mph} mph posted · cited at ${row.citation_mph}+</span>
+        ${row.posted_mph ? `<span class="speed-limits">${row.posted_mph} mph posted · cited at ${row.citation_mph}+</span>` : '<span class="speed-limits">limit not published</span>'}
       </div>
     `).join('')}
   `).join('');
+}
+
+function selectSpeedCity(city){
+  selectedSpeedCity = city;
+  renderSpeedCameraList(speedCameraData);
 }
 
 /* ---- Batch auto-fill cross streets (owner-run, rate-limited to respect free geocoder policy) ---- */
