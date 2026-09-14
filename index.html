@@ -1889,9 +1889,10 @@ initMapAll();
 loadEntries();
 loadSpeedCameras();
 
-function renderSpeedMarkersOnto(layer){
+function renderSpeedMarkersOnto(layer, filterCity){
   layer.clearLayers();
-  speedCameraData.forEach(row => {
+  const source = filterCity ? speedCameraData.filter(r => r.city === filterCity) : speedCameraData;
+  source.forEach(row => {
     if(row.lat == null || row.lng == null) return;
     const icon = L.divIcon({
       html: '<div style="width:20px;height:20px;background:#EF4444;border:2.5px solid #fff;transform:rotate(45deg);box-shadow:0 0 10px 3px rgba(239,68,68,0.85);"></div>',
@@ -1913,9 +1914,10 @@ function refreshAllSpeedLayers(){
   if(speedCameraLayer) renderSpeedMarkersOnto(speedCameraLayer);
   if(speedLayerAll) renderSpeedMarkersOnto(speedLayerAll);
   if(speedLayerOnly){
-    renderSpeedMarkersOnto(speedLayerOnly);
+    renderSpeedMarkersOnto(speedLayerOnly, selectedSpeedCity);
     if(mapSpeedOnly){
-      const coords = speedCameraData.filter(r => r.lat != null && r.lng != null).map(r => [r.lat, r.lng]);
+      const source = selectedSpeedCity ? speedCameraData.filter(r => r.city === selectedSpeedCity) : speedCameraData;
+      const coords = source.filter(r => r.lat != null && r.lng != null).map(r => [r.lat, r.lng]);
       if(coords.length > 0) mapSpeedOnly.fitBounds(coords, { padding: [30,30], maxZoom: 13 });
     }
   }
@@ -2002,6 +2004,7 @@ function renderSpeedCameraList(data){
 function selectSpeedCity(city){
   selectedSpeedCity = city;
   renderSpeedCameraList(speedCameraData);
+  refreshAllSpeedLayers();
 }
 
 /* ---- Batch auto-fill cross streets (owner-run, rate-limited to respect free geocoder policy) ---- */
