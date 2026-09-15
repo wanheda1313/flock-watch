@@ -1705,11 +1705,7 @@ function findWorstCameraOnRoute(routeCoords, camList){
   const afterI = Math.min(routeCoords.length - 1, worstIdx + step);
   const bearing = bearingBetween(routeCoords[beforeI][1], routeCoords[beforeI][0], routeCoords[afterI][1], routeCoords[afterI][0]);
   const [wlng, wlat] = routeCoords[worstIdx];
-  const optA = offsetPoint(wlat, wlng, (bearing + 90) % 360, 300);
-  const optB = offsetPoint(wlat, wlng, (bearing - 90 + 360) % 360, 300);
-  const distA = haversineMeters(optA.lat, optA.lng, worst[0], worst[1]);
-  const distB = haversineMeters(optB.lat, optB.lng, worst[0], worst[1]);
-  return distA >= distB ? optA : optB;
+  return { wlat, wlng, bearing, worst };
 }
 
 async function routeThroughWaypoints(start, end, waypoints){
@@ -1729,30 +1725,42 @@ async function attemptDetour(start, end, routeCoords, camList, baseMinutes, base
   let bestMiles = baseMiles;
   const waypoints = [];
   const maxAttempts = 4;
+  const offsetDistances = [300, 600, 1000, 1500];
 
   for(let attempt = 0; attempt < maxAttempts; attempt++){
     if(bestCount === 0) break;
-    const detourPoint = findWorstCameraOnRoute(bestCoords, camList);
-    if(!detourPoint) break;
-
-    const candidateWaypoints = [...waypoints, detourPoint];
+    const spot = findWorstCameraOnRoute(bestCoords, camList);
+    if(!spot) break;
     if(onProgress) onProgress(attempt + 1);
-    let result;
-    try{
-      result = await routeThroughWaypoints(start, end, candidateWaypoints);
-    }catch(err){
-      break;
+
+    let improved = false;
+    for(const dist of offsetDistances){
+      const optA = offsetPoint(spot.wlat, spot.wlng, (spot.bearing + 90) % 360, dist);
+      const optB = offsetPoint(spot.wlat, spot.wlng, (spot.bearing - 90 + 360) % 360, dist);
+      const distA = haversineMeters(optA.lat, optA.lng, spot.worst[0], spot.worst[1]);
+      const distB = haversineMeters(optB.lat, optB.lng, spot.worst[0], spot.worst[1]);
+      const chosen = distA >= distB ? optA : optB;
+
+      let result;
+      try{
+        result = await routeThroughWaypoints(start, end, [...waypoints, chosen]);
+      }catch(err){
+        continue;
+      }
+      if(!result) continue;
+
+      const newCount = countCamerasNearRoute(result.coords, camList);
+      if(newCount < bestCount){
+        waypoints.push(chosen);
+        bestCoords = result.coords;
+        bestCount = newCount;
+        bestMinutes = result.minutes;
+        bestMiles = result.miles;
+        improved = true;
+        break;
+      }
     }
-    if(!result) break;
-
-    const newCount = countCamerasNearRoute(result.coords, camList);
-    if(newCount >= bestCount) break; // this detour didn't help, stop here
-
-    waypoints.push(detourPoint);
-    bestCoords = result.coords;
-    bestCount = newCount;
-    bestMinutes = result.minutes;
-    bestMiles = result.miles;
+    if(!improved) break; // no offset distance helped, stop here
   }
 
   if(waypoints.length === 0) return null;
