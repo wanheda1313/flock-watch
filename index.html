@@ -1690,7 +1690,7 @@ function offsetPoint(lat, lng, bearingDeg, distMeters){
   return { lat: lat2*180/Math.PI, lng: lng2*180/Math.PI };
 }
 
-async function attemptDetour(start, end, routeCoords, camList){
+function findWorstCameraOnRoute(routeCoords, camList){
   let worst = null, worstDist = Infinity, worstIdx = -1;
   const step = Math.max(1, Math.floor(routeCoords.length/300));
   for(let i = 0; i < routeCoords.length; i += step){
@@ -1701,7 +1701,6 @@ async function attemptDetour(start, end, routeCoords, camList){
     }
   }
   if(!worst) return null;
-
   const beforeI = Math.max(0, worstIdx - step);
   const afterI = Math.min(routeCoords.length - 1, worstIdx + step);
   const bearing = bearingBetween(routeCoords[beforeI][1], routeCoords[beforeI][0], routeCoords[afterI][1], routeCoords[afterI][0]);
@@ -1710,24 +1709,62 @@ async function attemptDetour(start, end, routeCoords, camList){
   const optB = offsetPoint(wlat, wlng, (bearing - 90 + 360) % 360, 300);
   const distA = haversineMeters(optA.lat, optA.lng, worst[0], worst[1]);
   const distB = haversineMeters(optB.lat, optB.lng, worst[0], worst[1]);
-  const chosen = distA >= distB ? optA : optB;
+  return distA >= distB ? optA : optB;
+}
 
-  try{
-    const url = `https://router.project-osrm.org/route/v1/driving/${start.lng},${start.lat};${chosen.lng},${chosen.lat};${end.lng},${end.lat}?overview=full&geometries=geojson`;
-    const res = await fetch(url);
-    const data = await res.json();
-    if(!data.routes || data.routes.length === 0) return null;
-    const r = data.routes[0];
-    return {
-      coords: r.geometry.coordinates,
-      minutes: Math.round(r.duration / 60),
-      miles: (r.distance / 1609.34).toFixed(1),
-      camCount: countCamerasNearRoute(r.geometry.coordinates, camList),
-      isDetour: true
-    };
-  }catch(err){
-    return null;
+async function routeThroughWaypoints(start, end, waypoints){
+  const points = [start, ...waypoints, end].map(p => `${p.lng},${p.lat}`).join(';');
+  const url = `https://router.project-osrm.org/route/v1/driving/${points}?overview=full&geometries=geojson`;
+  const res = await fetch(url);
+  const data = await res.json();
+  if(!data.routes || data.routes.length === 0) return null;
+  const r = data.routes[0];
+  return { coords: r.geometry.coordinates, minutes: Math.round(r.duration / 60), miles: (r.distance / 1609.34).toFixed(1) };
+}
+
+async function attemptDetour(start, end, routeCoords, camList, baseMinutes, baseMiles, onProgress){
+  let bestCoords = routeCoords;
+  let bestCount = countCamerasNearRoute(routeCoords, camList);
+  let bestMinutes = baseMinutes;
+  let bestMiles = baseMiles;
+  const waypoints = [];
+  const maxAttempts = 4;
+
+  for(let attempt = 0; attempt < maxAttempts; attempt++){
+    if(bestCount === 0) break;
+    const detourPoint = findWorstCameraOnRoute(bestCoords, camList);
+    if(!detourPoint) break;
+
+    const candidateWaypoints = [...waypoints, detourPoint];
+    if(onProgress) onProgress(attempt + 1);
+    let result;
+    try{
+      result = await routeThroughWaypoints(start, end, candidateWaypoints);
+    }catch(err){
+      break;
+    }
+    if(!result) break;
+
+    const newCount = countCamerasNearRoute(result.coords, camList);
+    if(newCount >= bestCount) break; // this detour didn't help, stop here
+
+    waypoints.push(detourPoint);
+    bestCoords = result.coords;
+    bestCount = newCount;
+    bestMinutes = result.minutes;
+    bestMiles = result.miles;
   }
+
+  if(waypoints.length === 0) return null;
+
+  return {
+    coords: bestCoords,
+    minutes: bestMinutes,
+    miles: bestMiles,
+    camCount: bestCount,
+    isDetour: true,
+    detourCount: waypoints.length
+  };
 }
 
 function selectRoute(idx){
@@ -1776,8 +1813,10 @@ findRouteBtn.addEventListener('click', async () => {
     let bestSoFar = 0;
     routeOptionsData.forEach((r,i) => { if(r.camCount < routeOptionsData[bestSoFar].camCount) bestSoFar = i; });
     if(routeOptionsData[bestSoFar].camCount > 0){
-      routeResults.innerHTML = '<p class="route-note">Found routes — trying to detour around the nearest camera…</p>';
-      const detour = await attemptDetour(start, end, routeOptionsData[bestSoFar].coords, camList);
+      const base = routeOptionsData[bestSoFar];
+      const detour = await attemptDetour(start, end, base.coords, camList, base.minutes, base.miles, (n) => {
+        routeResults.innerHTML = `<p class="route-note">Found routes — trying detour ${n} around the next closest camera…</p>`;
+      });
       if(detour && detour.camCount < routeOptionsData[bestSoFar].camCount){
         routeOptionsData.push(detour);
       }
@@ -1791,7 +1830,7 @@ findRouteBtn.addEventListener('click', async () => {
     routeResults.innerHTML = `<div class="route-options">${routeOptionsData.map((r,i) => `
       <div class="route-option">
         <div onclick="selectRoute(${i})" style="flex:1;cursor:pointer;">
-          <div class="route-label">${r.isDetour ? 'Detour route' : `Route ${i+1}`}${i === bestIdx ? (zeroCam ? ' — avoids all cameras' : ' — fewest cameras found') : ''}</div>
+          <div class="route-label">${r.isDetour ? `Detour route (${r.detourCount} reroute${r.detourCount === 1 ? '' : 's'})` : `Route ${i+1}`}${i === bestIdx ? (zeroCam ? ' — avoids all cameras' : ' — fewest cameras found') : ''}</div>
           <div class="route-meta">${r.minutes} min · ${r.miles} mi</div>
         </div>
         <a class="link-btn" href="${googleMapsUrl(start, end, r.coords)}" target="_blank" rel="noopener" onclick="event.stopPropagation();">Open in Google Maps ↗</a>
