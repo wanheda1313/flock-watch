@@ -821,6 +821,7 @@
 
 <script>
 const SUPABASE_URL = 'https://qgymszrpaicqgiwcyxpd.supabase.co';
+const PROXY_BASE = 'https://flock-watch-proxy.anastalgic.workers.dev';
 const SUPABASE_KEY = 'sb_publishable_VL8Zf1BFi9eFbtLNFSBMOg_3fcXxfpw';
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const TABLE = 'camera_entries';
@@ -1362,7 +1363,7 @@ function haversineMetersLocal(lat1, lng1, lat2, lng2){
 async function buildLocationSuggestion(lat, lng, entryCity){
   const [streets, geoRes] = await Promise.all([
     findNearestCrossStreets(lat, lng).catch(() => []),
-    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`).then(r => r.json()).catch(() => null)
+    fetch(`${PROXY_BASE}/nominatim/reverse?format=json&lat=${lat}&lon=${lng}&zoom=18&addressdetails=1`).then(r => r.json()).catch(() => null)
   ]);
   const addr = (geoRes && geoRes.address) || {};
   const city = entryCity || addr.city || addr.town || addr.village || '';
@@ -1397,7 +1398,7 @@ async function buildLocationSuggestion(lat, lng, entryCity){
 
 async function findNearestCrossStreets(lat, lng){
   const query = `[out:json][timeout:10];way["highway"]["name"](around:150,${lat},${lng});out tags geom;`;
-  const url = `https://overpass-api.de/api/interpreter?data=${encodeURIComponent(query)}`;
+  const url = `${PROXY_BASE}/overpass?data=${encodeURIComponent(query)}`;
   const res = await fetch(url);
   const data = await res.json();
   const byName = {};
@@ -1632,7 +1633,7 @@ function haversineMeters(lat1, lng1, lat2, lng2){
 }
 
 async function geocode(query){
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
+  const url = `${PROXY_BASE}/nominatim/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
   const res = await fetch(url);
   const data = await res.json();
   if(!data || data.length === 0) return null;
@@ -1882,13 +1883,13 @@ function renderSpeedMarkersOnto(layer, filterCity){
   source.forEach(row => {
     if(row.lat == null || row.lng == null) return;
     const icon = L.divIcon({
-      html: '<div style="width:20px;height:20px;background:#EF4444;border:2.5px solid #fff;transform:rotate(45deg);box-shadow:0 0 10px 3px rgba(239,68,68,0.85);"></div>',
+      html: '<div style="width:20px;height:20px;background:#FDBA74;border:2.5px solid #fff;transform:rotate(45deg);box-shadow:0 0 10px 3px rgba(253,186,116,0.85);"></div>',
       className: '',
       iconSize: [20,20]
     });
     const marker = L.marker([row.lat, row.lng], { icon, zIndexOffset: 1000 });
     marker.bindPopup(`
-      <span class="popup-status" style="color:#EF4444;">Speed Safety Camera</span>
+      <span class="popup-status" style="color:#FDBA74;">Speed Safety Camera</span>
       <strong>${escapeHtml(row.street)}</strong><br>
       ${escapeHtml(row.cross_streets)}${row.city ? `, ${escapeHtml(row.city)}, CA` : ''}
       ${row.posted_mph ? `<div style="margin-top:6px;font-size:0.8rem;color:var(--text-soft);">${row.posted_mph} mph posted · cited at ${row.citation_mph}+</div>` : ''}
