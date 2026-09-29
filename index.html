@@ -301,6 +301,31 @@
     color:var(--text-soft);
     margin:0 0 6px;
   }
+  .entry-photo-thumb{
+    width:76px;
+    height:76px;
+    object-fit:cover;
+    border-radius:8px;
+    border:1px solid var(--border);
+    float:right;
+    margin:0 0 8px 12px;
+    cursor:pointer;
+  }
+  .popup-photo img{
+    width:100%;
+    max-height:160px;
+    object-fit:cover;
+    border-radius:8px;
+    margin:8px 0;
+    display:block;
+  }
+  #fPhotoPreview, #fPhotoExisting{
+    max-width:220px;
+    max-height:220px;
+    border-radius:8px;
+    border:1px solid var(--border);
+    display:block;
+  }
   .entry-notes{
     font-size:0.92rem;
     color:var(--text);
@@ -786,6 +811,19 @@
     </div>
     <div class="field-row" style="grid-template-columns:1fr;">
       <div class="field">
+        <label for="fPhotoFile">Upload a photo (optional)</label>
+        <input type="file" id="fPhotoFile" accept="image/*">
+        <div id="fPhotoPreviewWrap" style="display:none;margin-top:10px;">
+          <img id="fPhotoPreview" alt="Selected photo preview">
+        </div>
+        <div id="fPhotoExistingWrap" style="display:none;margin-top:10px;">
+          <span style="font-size:0.82rem;color:var(--text-soft);">Current photo:</span><br>
+          <img id="fPhotoExisting" alt="Current photo">
+        </div>
+      </div>
+    </div>
+    <div class="field-row" style="grid-template-columns:1fr;">
+      <div class="field">
         <label for="fNotes">Notes</label>
         <textarea id="fNotes" placeholder="Anything else worth recording"></textarea>
       </div>
@@ -1031,6 +1069,7 @@ function rowToEntry(row){
     agency: row.agency,
     reporter: row.reporter,
     photo: row.photo,
+    photoUrl: row.photo_url || '',
     notes: row.notes,
     lat: row.lat,
     lng: row.lng,
@@ -1051,6 +1090,7 @@ function entryToRow(entry){
     agency: entry.agency || null,
     reporter: entry.reporter,
     photo: entry.photo,
+    photo_url: entry.photoUrl || null,
     notes: entry.notes,
     lat: entry.lat != null && entry.lat !== '' ? Number(entry.lat) : null,
     lng: entry.lng != null && entry.lng !== '' ? Number(entry.lng) : null,
@@ -1140,6 +1180,7 @@ function buildDetailCardHtml(e, cameraNumber){
     <div class="popup-cam-number">FLOCK CAMERA #${String(cameraNumber).padStart(3,'0')}</div>
     <div class="popup-location">📍 ${escapeHtml(e.location)}</div>
     ${e.city ? `<div class="popup-city">${escapeHtml(e.city)}, CA</div>` : ''}
+    ${e.photoUrl ? `<div class="popup-photo"><img src="${escapeHtml(e.photoUrl)}" alt="Photo of this camera" loading="lazy"></div>` : ''}
     <div class="popup-detail-row"><span>Status</span><span class="popup-status-val" style="color:${meta.color};">${meta.label}</span></div>
     <div class="popup-detail-row"><span>First reported</span><span>${fmtDate(e.date)}</span></div>
     <div class="popup-detail-row"><span>Last confirmed</span><span>${lastConfirmedText}</span></div>
@@ -1264,6 +1305,15 @@ function openForm(entry){
   document.getElementById('fLat').value = entry && entry.lat != null ? entry.lat : '';
   document.getElementById('fLng').value = entry && entry.lng != null ? entry.lng : '';
   document.querySelector('#formPanel h2').textContent = entry ? 'Edit entry' : 'New entry';
+  document.getElementById('fPhotoFile').value = '';
+  document.getElementById('fPhotoPreviewWrap').style.display = 'none';
+  const existingWrap = document.getElementById('fPhotoExistingWrap');
+  if(entry && entry.photoUrl){
+    document.getElementById('fPhotoExisting').src = entry.photoUrl;
+    existingWrap.style.display = 'block';
+  }else{
+    existingWrap.style.display = 'none';
+  }
   document.getElementById('turnstileWrap').style.display = entry ? 'none' : 'block';
   if(!entry && window.turnstile){
     try{ turnstile.reset('#turnstileWidget'); }catch(err){ /* not rendered yet, ignore */ }
@@ -1277,6 +1327,42 @@ function closeForm(){
 }
 
 cancelFormBtn.addEventListener('click', closeForm);
+
+document.getElementById('fPhotoFile').addEventListener('change', (ev) => {
+  const file = ev.target.files && ev.target.files[0];
+  const previewWrap = document.getElementById('fPhotoPreviewWrap');
+  if(!file){
+    previewWrap.style.display = 'none';
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = () => {
+    document.getElementById('fPhotoPreview').src = reader.result;
+    previewWrap.style.display = 'block';
+  };
+  reader.readAsDataURL(file);
+});
+
+async function uploadPhotoIfSelected(entryId){
+  const fileInput = document.getElementById('fPhotoFile');
+  const file = fileInput.files && fileInput.files[0];
+  if(!file) return null;
+  try{
+    const ext = ((file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')) || 'jpg';
+    const path = `${entryId}-${Date.now()}.${ext}`;
+    const { error } = await db.storage.from('camera-photos').upload(path, file, { cacheControl: '3600', upsert: false });
+    if(error){
+      console.error('Photo upload failed', error);
+      alert('Your entry will still save, but the photo could not be uploaded. Please try adding it again by editing the entry.');
+      return null;
+    }
+    const { data } = db.storage.from('camera-photos').getPublicUrl(path);
+    return data ? data.publicUrl : null;
+  }catch(err){
+    console.error('Photo upload failed', err);
+    return null;
+  }
+}
 
 saveEntryBtn.addEventListener('click', async () => {
   const location = document.getElementById('fLocation').value.trim();
@@ -1295,8 +1381,18 @@ saveEntryBtn.addEventListener('click', async () => {
     }
   }
 
+  const entryId = editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,7));
+  const existingEntry = wasEditing ? entries.find(e => e.id === editingId) : null;
+  let photoUrl = existingEntry ? (existingEntry.photoUrl || '') : '';
+
+  saveEntryBtn.disabled = true;
+  saveEntryBtn.textContent = 'Saving…';
+  const uploadedPhotoUrl = await uploadPhotoIfSelected(entryId);
+  if(uploadedPhotoUrl) photoUrl = uploadedPhotoUrl;
+  saveEntryBtn.textContent = 'Save entry';
+
   const entryData = {
-    id: editingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,7)),
+    id: entryId,
     location,
     city: document.getElementById('fCity').value.trim(),
     date: document.getElementById('fDate').value || new Date().toISOString().slice(0,10),
@@ -1304,6 +1400,7 @@ saveEntryBtn.addEventListener('click', async () => {
     agency: document.getElementById('fAgency').value.trim(),
     reporter: document.getElementById('fReporter').value.trim(),
     photo: document.getElementById('fPhoto').value.trim(),
+    photoUrl,
     notes: document.getElementById('fNotes').value.trim(),
     lat: document.getElementById('fLat').value.trim(),
     lng: document.getElementById('fLng').value.trim(),
@@ -1624,6 +1721,7 @@ function render(){
       return `
       <div class="entry">
         <div class="entry-body">
+          ${e.photoUrl ? `<img class="entry-photo-thumb" src="${escapeHtml(e.photoUrl)}" alt="Photo of this camera" loading="lazy" onclick="window.open('${escapeHtml(e.photoUrl)}','_blank')">` : ''}
           <span class="entry-date">${fmtDate(e.date)}</span>
           <h3>${escapeHtml(e.location)}</h3>
           ${e.photo ? `<div class="entry-photo">${escapeHtml(e.photo)}</div>` : ''}
