@@ -771,6 +771,7 @@
       <option value="removed">Removed only</option>
     </select>
     <button class="btn" onclick="switchTab('report'); openForm(null);">+ File a sighting</button>
+    <button class="btn secondary" onclick="downloadEntriesCsv()">⬇ Download data (CSV)</button>
   </div>
 
   <div class="list-grid">
@@ -785,7 +786,9 @@
       </div>
     </div>
     <div>
-      <div class="section-title">Known operating agencies</div>
+      <div class="section-title">Cameras by city</div>
+      <div class="agency-card" id="cityBreakdownContainer"><p class="agency-empty">Loading…</p></div>
+      <div class="section-title" style="margin-top:20px;">Known operating agencies</div>
       <div class="agency-card" id="agencyContainer"><p class="agency-empty">Loading…</p></div>
     </div>
   </div>
@@ -1226,8 +1229,44 @@ function buildDetailCardHtml(e, cameraNumber){
       ${mapLink ? `<a href="${mapLink}" target="_blank" rel="noopener">View on Google Maps ↗</a>` : ''}
       <button onclick="confirmEntry('${e.id}')">✓ Still there</button>
       <button onclick="editEntry('${e.id}')">Edit</button>
+      <button onclick="shareCamera('${e.id}', this)" id="shareBtn-${e.id}">🔗 Share this camera</button>
     </div>
   `;
+}
+
+function shareCamera(id, btn){
+  const url = `${window.location.origin}${window.location.pathname}?cam=${encodeURIComponent(id)}`;
+  const revertText = btn ? btn.textContent : null;
+  const showCopied = () => {
+    if(!btn) return;
+    btn.textContent = '✓ Link copied!';
+    setTimeout(() => { btn.textContent = revertText; }, 1800);
+  };
+  if(navigator.clipboard && navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(showCopied).catch(() => { window.prompt('Copy this link:', url); });
+  }else{
+    window.prompt('Copy this link:', url);
+  }
+}
+
+function openCameraDeepLink(){
+  const params = new URLSearchParams(window.location.search);
+  const camId = params.get('cam');
+  if(!camId) return;
+  const entry = entries.find(e => e.id === camId);
+  if(!entry) return;
+  const coords = getCoords(entry);
+  if(!coords) return;
+  switchTab('log');
+  setTimeout(() => {
+    if(!mapAll) return;
+    mapAll.setView(coords, 17);
+    const cameraNumbers = computeCameraNumbers();
+    L.popup({ maxWidth: 300 })
+      .setLatLng(coords)
+      .setContent(buildDetailCardHtml(entry, cameraNumbers[entry.id]))
+      .openOn(mapAll);
+  }, 300);
 }
 
 function renderAlprMarkersOnto(targetMap, clusterLayer, cutoffDate){
@@ -1302,6 +1341,7 @@ async function loadEntries(){
   render();
   renderMap(null);
   renderMapAll();
+  openCameraDeepLink();
 }
 
 async function insertEntry(entry){
@@ -1627,20 +1667,44 @@ async function lookupStreet(id, btn){
   btn.disabled = false;
 }
 
+function getVotedMap(){
+  try{ return JSON.parse(localStorage.getItem('fw_votes') || '{}'); }catch(err){ return {}; }
+}
+function markVoted(id, type){
+  try{
+    const votes = getVotedMap();
+    votes[id] = type;
+    localStorage.setItem('fw_votes', JSON.stringify(votes));
+  }catch(err){ /* storage unavailable (private browsing, etc) — skip silently */ }
+}
+function hasVoted(id){
+  return !!getVotedMap()[id];
+}
+
 async function confirmEntry(id){
+  if(hasVoted(id)){
+    alert("You've already checked in on this camera from this browser. Thanks for helping verify it!");
+    return;
+  }
   const idx = entries.findIndex(e => e.id === id);
   if(idx === -1) return;
   entries[idx].confirmedCount = (entries[idx].confirmedCount || 0) + 1;
   entries[idx].lastVerified = new Date().toISOString().slice(0,10);
+  markVoted(id, 'confirm');
   render();
   await updateEntryRow(entries[idx]);
 }
 
 async function disputeEntry(id){
+  if(hasVoted(id)){
+    alert("You've already checked in on this camera from this browser. Thanks for helping verify it!");
+    return;
+  }
   const idx = entries.findIndex(e => e.id === id);
   if(idx === -1) return;
   entries[idx].disputedCount = (entries[idx].disputedCount || 0) + 1;
   entries[idx].lastVerified = new Date().toISOString().slice(0,10);
+  markVoted(id, 'dispute');
   render();
   await updateEntryRow(entries[idx]);
 }
@@ -1674,6 +1738,52 @@ function renderAgencies(){
       <span class="agency-count">${counts[n]}</span>
     </div>
   `).join('');
+}
+
+function renderCityBreakdown(){
+  const container = document.getElementById('cityBreakdownContainer');
+  if(!container) return;
+  const counts = {};
+  entries.forEach(e => {
+    const c = (e.city && e.city.trim()) || 'Unspecified';
+    counts[c] = (counts[c] || 0) + 1;
+  });
+  const names = Object.keys(counts).sort((a,b) => counts[b] - counts[a]);
+  if(names.length === 0){
+    container.innerHTML = '<p class="agency-empty">No entries yet.</p>';
+    return;
+  }
+  container.innerHTML = names.map(n => `
+    <div class="agency-row">
+      <span class="agency-name">${escapeHtml(n)}</span>
+      <span class="agency-count">${counts[n]}</span>
+    </div>
+  `).join('');
+}
+
+function csvEscape(val){
+  const s = (val === null || val === undefined) ? '' : String(val);
+  if(/[",\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+  return s;
+}
+
+function downloadEntriesCsv(){
+  const headers = ['id','location','city','date','status','agency','reporter','photo_description','photo_url','notes','lat','lng','confirmed_count','disputed_count','last_verified','updated_at'];
+  const rows = entries.map(e => [
+    e.id, e.location, e.city, e.date, e.status, e.agency, e.reporter,
+    e.photo, e.photoUrl, e.notes, e.lat, e.lng,
+    e.confirmedCount || 0, e.disputedCount || 0, e.lastVerified, e.updatedAt
+  ]);
+  const csv = [headers.join(',')].concat(rows.map(r => r.map(csvEscape).join(','))).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `flock-watch-cameras-${new Date().toISOString().slice(0,10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function renderRecentTable(){
@@ -1716,6 +1826,7 @@ function render(){
   lastReportedEl.textContent = relTime ? `Updated ${relTime}` : '';
 
   renderAgencies();
+  renderCityBreakdown();
   renderRecentTable();
 
   const paginationBar = document.getElementById('paginationBar');
