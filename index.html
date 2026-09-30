@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Flock Watch — Community Camera Log</title>
+<meta name="description" content="A community-maintained map of Flock Safety / ALPR cameras and AB 645 speed safety cameras across Southern California. Report sightings, check routes, and see what's near you.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230B1A18'/%3E%3Ccircle cx='32' cy='32' r='18' fill='%232DD4BF'/%3E%3Ccircle cx='32' cy='32' r='8' fill='%230B1A18'/%3E%3Ccircle cx='27' cy='27' r='3' fill='%23FFFFFF' opacity='0.6'/%3E%3C/svg%3E">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Flock Watch — Community Camera Log">
+<meta property="og:description" content="A community-maintained map of Flock Safety / ALPR cameras and AB 645 speed safety cameras across Southern California. Report sightings, check routes, and see what's near you.">
+<meta property="og:image" content="https://images.unsplash.com/photo-1773504794256-8807439d2d0d?fm=jpg&q=60&w=1200&auto=format&fit=crop">
+<meta property="og:url" content="https://wanheda1313.github.io/flock-watch/">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Flock Watch — Community Camera Log">
+<meta name="twitter:description" content="A community-maintained map of Flock Safety / ALPR cameras and AB 645 speed safety cameras across Southern California.">
+<meta name="twitter:image" content="https://images.unsplash.com/photo-1773504794256-8807439d2d0d?fm=jpg&q=60&w=1200&auto=format&fit=crop">
 <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
@@ -111,6 +122,24 @@
     border-radius:12px;
     padding:12px 16px;
     margin-bottom:24px;
+  }
+  .intro-blurb{
+    font-size:0.95rem;
+    line-height:1.5;
+    color:var(--text);
+    background:var(--card);
+    border:1px solid var(--border);
+    border-left:3px solid var(--accent2);
+    border-radius:12px;
+    padding:16px 18px;
+    margin-bottom:18px;
+  }
+  .intro-blurb strong{ color:#fff; }
+  .feedback-note{
+    font-size:0.82rem;
+    color:var(--text-soft);
+    text-align:center;
+    padding:18px 12px 6px;
   }
 
   .section-title{
@@ -662,6 +691,10 @@
 
 <div class="content">
 
+  <div class="intro-blurb">
+    <strong>New here?</strong> This is a free, community-run map of two different camera programs in Southern California: license-plate reader (ALPR/Flock Safety) cameras under <strong>Camera Log</strong>, and government-run <strong>Speed Cameras</strong> (a separate, state-authorized pilot program). Use <strong>Report a Camera</strong> to add a real sighting, or <strong>Map &amp; Routes</strong> to see everything plotted and plan a route. Everything here is community-sourced — nothing is guaranteed accurate or complete.
+  </div>
+
   <div class="notice">Shared record — anyone with this page can read and add entries. Leave out anything you wouldn't want public. Cross-street precision depends on whoever files the entry — coordinate-only entries link straight to Google Maps for the exact spot instead.</div>
 
   <div class="tab-bar">
@@ -860,6 +893,8 @@
   <div id="speedCameraList"><p class="agency-empty">Loading…</p></div>
 
   </div>
+
+  <div class="feedback-note">Found a bug, or have a suggestion? Feedback is always welcome — thanks for helping keep this accurate.</div>
 
 </div>
 
